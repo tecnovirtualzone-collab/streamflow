@@ -13,7 +13,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 # ── Pon aquí la URL M3U de tu proveedor mayorista ────────────────
-URL_M3U_PROVEEDOR = os.environ.get('URL_M3U', 'http://TU-PROVEEDOR.COM/get.php?username=USER&password=PASS&type=m3u_plus')
+URL_M3U_PROVEEDOR = os.environ.get('URL_M3U', 'https://raw.githubusercontent.com/iptv-org/iptv/master/streams/co.m3u')
 
 PAQUETES = {
     'basico':   {'max_conexiones': 1},
@@ -252,6 +252,97 @@ def stats():
         'usuarios_expirados': expirados,
         'online_ahora':      online
     })
+
+# ════════════════════════════════════════════════════════════════
+#  XTREAM CODES API — Compatible con IPTV Smarters Pro
+# ════════════════════════════════════════════════════════════════
+
+def generar_m3u_contenido(usuario, contrasena, host):
+    resp = requests.get(URL_M3U_PROVEEDOR, timeout=15)
+    lineas = resp.text.splitlines()
+    nueva_m3u = []
+    i = 0
+    while i < len(lineas):
+        linea = lineas[i]
+        if linea.startswith('#EXTINF'):
+            nueva_m3u.append(linea)
+            if i + 1 < len(lineas):
+                url_original = lineas[i + 1]
+                canal_id = abs(hash(url_original)) % 999999
+                nueva_url = f"{host}/stream?user={usuario}&pass={contrasena}&channel={canal_id}"
+                nueva_m3u.append(nueva_url)
+                i += 2
+                continue
+        else:
+            nueva_m3u.append(linea)
+        i += 1
+    return '\n'.join(nueva_m3u)
+
+@app.route('/player_api.php')
+def player_api():
+    usuario    = request.args.get('username', '')
+    contrasena = request.args.get('password', '')
+
+    user = Usuario.query.filter_by(usuario=usuario, activo=True).first()
+    if not user or not check_password_hash(user.contrasena, contrasena):
+        return jsonify({"user_info": {"auth": 0}}), 401
+    if datetime.utcnow() > user.fecha_expira:
+        return jsonify({"user_info": {"auth": 0}}), 401
+
+    host = request.host_url.rstrip('/')
+    return jsonify({
+        "user_info": {
+            "auth": 1,
+            "username": usuario,
+            "password": contrasena,
+            "status": "Active",
+            "exp_date": str(int(user.fecha_expira.timestamp())),
+            "is_trial": "0",
+            "active_cons": str(len(user.sesiones)),
+            "created_at": str(int(user.creado.timestamp())),
+            "max_connections": str(user.max_conexiones),
+            "allowed_output_formats": ["m3u8", "ts"]
+        },
+        "server_info": {
+            "url": host,
+            "port": "443",
+            "https_port": "443",
+            "server_protocol": "https",
+            "rtmp_port": "443",
+            "timestamp_now": int(datetime.utcnow().timestamp()),
+            "time_now": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        }
+    })
+
+@app.route('/get.php')
+def get_php():
+    usuario    = request.args.get('username', '')
+    contrasena = request.args.get('password', '')
+
+    user = Usuario.query.filter_by(usuario=usuario, activo=True).first()
+    if not user or not check_password_hash(user.contrasena, contrasena):
+        return "Acceso denegado", 403
+    if datetime.utcnow() > user.fecha_expira:
+        return "Cuenta expirada", 403
+
+    ip  = request.headers.get('X-Real-IP', request.remote_addr)
+    mac = request.headers.get('X-MAC-Address', '')
+    limpiar_sesiones()
+    sesiones   = SesionActiva.query.filter_by(usuario_id=user.id).all()
+    ips_activas = list({s.ip for s in sesiones})
+    if ip not in ips_activas and len(ips_activas) >= user.max_conexiones:
+        return "Límite de conexiones alcanzado", 403
+
+    sesion = SesionActiva(usuario_id=user.id, ip=ip, mac=mac, canal='m3u')
+    db.session.add(sesion)
+    db.session.commit()
+
+    try:
+        host    = request.host_url.rstrip('/')
+        content = generar_m3u_contenido(usuario, contrasena, host)
+        return Response(content, content_type='application/x-mpegURL')
+    except Exception:
+        return "Error al obtener lista", 502
 
 # ════════════════════════════════════════════════════════════════
 #  INICIO
