@@ -277,9 +277,6 @@ def stats():
         'usuarios_expirados': Usuario.query.filter(Usuario.fecha_expira < datetime.utcnow()).count(),
         'online_ahora':       SesionActiva.query.distinct(SesionActiva.usuario_id).count()
     })
-@app.route('/loaderio-1cc623c205ed6c3a2e36c5b7875bf8fc.txt')
-def loaderio():
-    return 'loaderio-1cc623c205ed6c3a2e36c5b7875bf8fc'
 
 with app.app_context():
     db.create_all()
