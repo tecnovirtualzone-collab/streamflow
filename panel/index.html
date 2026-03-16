@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamFlow — Panel Admin</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
+  .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#1a1d27;padding:24px 16px;display:flex;flex-direction:column;gap:8px}
+  .logo{font-size:20px;font-weight:700;color:#6366f1;margin-bottom:16px;padding:0 8px}
+  .nav-btn{background:none;border:none;color:#94a3b8;padding:10px 12px;border-radius:8px;cursor:pointer;text-align:left;width:100%;font-size:14px;transition:all .2s}
+  .nav-btn:hover,.nav-btn.active{background:#6366f1;color:#fff}
+  .main{margin-left:220px;padding:32px}
+  .page{display:none}.page.active{display:block}
+  h1{font-size:24px;font-weight:600;margin-bottom:24px}
+  .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:32px}
+  .stat-card{background:#1a1d27;border-radius:12px;padding:20px;border:1px solid #2d3148}
+  .stat-val{font-size:32px;font-weight:700;color:#6366f1}
+  .stat-label{font-size:13px;color:#64748b;margin-top:4px}
+  .card{background:#1a1d27;border-radius:12px;padding:24px;border:1px solid #2d3148;margin-bottom:24px}
+  .card h2{font-size:16px;font-weight:600;margin-bottom:16px;color:#cbd5e1}
+  .form-row{display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:16px}
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;color:#64748b}
+  input,select{background:#0f1117;border:1px solid #2d3148;color:#e2e8f0;padding:8px 12px;border-radius:8px;font-size:14px;outline:none}
+  input:focus,select:focus{border-color:#6366f1}
+  .btn{padding:8px 16px;border-radius:8px;border:none;cursor:pointer;font-size:14px;font-weight:500;transition:all .2s}
+  .btn-primary{background:#6366f1;color:#fff}.btn-primary:hover{background:#4f46e5}
+  .btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+  .btn-warn{background:#f59e0b;color:#000}.btn-warn:hover{background:#d97706}
+  .btn-sm{padding:4px 10px;font-size:12px}
+  table{width:100%;border-collapse:collapse}
+  th{text-align:left;padding:10px 12px;font-size:12px;color:#64748b;border-bottom:1px solid #2d3148}
+  td{padding:10px 12px;font-size:13px;border-bottom:1px solid #1e2235}
+  tr:hover td{background:#1e2235}
+  .badge{padding:2px 8px;border-radius:20px;font-size:11px;font-weight:600}
+  .badge-green{background:#064e3b;color:#34d399}
+  .badge-red{background:#450a0a;color:#f87171}
+  .badge-yellow{background:#451a03;color:#fbbf24}
+  .modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:100;align-items:center;justify-content:center}
+  .modal.open{display:flex}
+  .modal-box{background:#1a1d27;border-radius:16px;padding:32px;width:400px;border:1px solid #2d3148}
+  .modal-box h3{font-size:18px;margin-bottom:20px}
+  .cred-box{background:#0f1117;border-radius:8px;padding:16px;margin:12px 0;font-family:monospace;font-size:14px;line-height:2}
+  .cred-label{color:#64748b;font-size:11px}
+  .cred-val{color:#6366f1;font-weight:700;font-size:16px}
+  .alert{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px}
+  .alert-info{background:#1e3a5f;color:#93c5fd;border:1px solid #1d4ed8}
+</style>
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="logo">⚡ StreamFlow</div>
+  <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
+  <button class="nav-btn" onclick="showPage('usuarios')">👥 Usuarios</button>
+  <button class="nav-btn" onclick="showPage('nuevo')">➕ Nuevo usuario</button>
+</div>
+
+<div class="main">
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <h1>Dashboard</h1>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-val" id="s-total">—</div><div class="stat-label">Total usuarios</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-activos">—</div><div class="stat-label">Activos</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-online">—</div><div class="stat-label">Online ahora</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-expirados">—</div><div class="stat-label">Expirados</div></div>
+    </div>
+    <div class="card">
+      <h2>Estado del sistema</h2>
+      <div class="alert alert-info">✅ API conectada — Restricciones activas: MAC · IP simultánea · Expiración</div>
+    </div>
+  </div>
+
+  <!-- USUARIOS -->
+  <div class="page" id="page-usuarios">
+    <h1>Usuarios</h1>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th><th>Paquete</th><th>Estado</th>
+            <th>Expira en</th><th>Conexiones</th><th>MACs</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-usuarios"><tr><td colspan="7" style="color:#64748b">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- NUEVO USUARIO -->
+  <div class="page" id="page-nuevo">
+    <h1>Nuevo usuario</h1>
+    <div class="card">
+      <div class="form-row">
+        <div class="field">
+          <label>Nombre de usuario</label>
+          <input id="nu-usuario" placeholder="ej: cliente01" style="width:200px">
+        </div>
+        <div class="field">
+          <label>Paquete</label>
+          <select id="nu-paquete">
+            <option value="basico">Básico (1 pantalla)</option>
+            <option value="premium">Premium (2 pantallas)</option>
+            <option value="familiar">Familiar (3 pantallas)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Días de validez</label>
+          <select id="nu-dias">
+            <option value="7">7 días</option>
+            <option value="30" selected>30 días</option>
+            <option value="90">90 días</option>
+            <option value="365">1 año</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="crearUsuario()">Crear usuario</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- MODAL CREDENCIALES -->
+<div class="modal" id="modal-cred">
+  <div class="modal-box">
+    <h3>✅ Usuario creado</h3>
+    <p style="color:#64748b;font-size:13px;margin-bottom:8px">Envía estos datos al cliente:</p>
+    <div class="cred-box">
+      <div><span class="cred-label">URL M3U: </span><span class="cred-val" id="c-url" style="font-size:12px"></span></div>
+      <div><span class="cred-label">Usuario: </span><span class="cred-val" id="c-user"></span></div>
+      <div><span class="cred-label">Contraseña: </span><span class="cred-val" id="c-pass"></span></div>
+      <div><span class="cred-label">Paquete: </span><span class="cred-val" id="c-pkg"></span></div>
+      <div><span class="cred-label">Expira: </span><span class="cred-val" id="c-exp" style="font-size:13px"></span></div>
+    </div>
+    <button class="btn btn-primary" style="width:100%;margin-top:8px" onclick="copiarCreds()">📋 Copiar datos</button>
+    <button class="btn" style="width:100%;margin-top:8px;background:#2d3148;color:#e2e8f0" onclick="cerrarModal()">Cerrar</button>
+  </div>
+</div>
+
+<!-- MODAL MACs -->
+<div class="modal" id="modal-macs">
+  <div class="modal-box" style="width:480px">
+    <h3>📱 Dispositivos registrados</h3>
+    <div id="lista-macs" style="margin:16px 0"></div>
+    <button class="btn" style="width:100%;background:#2d3148;color:#e2e8f0" onclick="document.getElementById('modal-macs').classList.remove('open')">Cerrar</button>
+  </div>
+</div>
+
+<script>
+  const API = window.location.origin;
+  let lastCreds = {};
+
+  function showPage(p) {
+    document.querySelectorAll('.page').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(x => x.classList.remove('active'));
+    document.getElementById('page-' + p).classList.add('active');
+    event.target.classList.add('active');
+    if (p === 'dashboard') cargarStats();
+    if (p === 'usuarios') cargarUsuarios();
+  }
+
+  async function cargarStats() {
+    try {
+      const r = await fetch(API + '/admin/stats');
+      const d = await r.json();
+      document.getElementById('s-total').textContent = d.total_usuarios;
+      document.getElementById('s-activos').textContent = d.usuarios_activos;
+      document.getElementById('s-online').textContent = d.online_ahora;
+      document.getElementById('s-expirados').textContent = d.usuarios_expirados;
+    } catch(e) {}
+  }
+
+  async function cargarUsuarios() {
+    const tbody = document.getElementById('tabla-usuarios');
+    tbody.innerHTML = '<tr><td colspan="7" style="color:#64748b">Cargando...</td></tr>';
+    try {
+      const r = await fetch(API + '/admin/usuarios');
+      const users = await r.json();
+      if (!users.length) { tbody.innerHTML = '<tr><td colspan="7" style="color:#64748b">Sin usuarios aún</td></tr>'; return; }
+      tbody.innerHTML = users.map(u => {
+        const estado = !u.activo ? '<span class="badge badge-red">Suspendido</span>'
+          : u.expira_en_dias <= 0 ? '<span class="badge badge-yellow">Expirado</span>'
+          : '<span class="badge badge-green">Activo</span>';
+        const expira = u.expira_en_dias > 0 ? `${u.expira_en_dias} días` : 'Expirado';
+        return `<tr>
+          <td><strong>${u.usuario}</strong></td>
+          <td>${u.paquete}</td>
+          <td>${estado}</td>
+          <td>${expira}</td>
+          <td>${u.conexiones_activas} / ${u.max_conexiones}</td>
+          <td><button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="verMacs(${u.id},'${u.usuario}')">${u.macs_registradas} MACs</button></td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
+            <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="suspender(${u.id})">${u.activo?'Suspender':'Activar'}</button>
+            <button class="btn btn-sm btn-danger" onclick="eliminar(${u.id},'${u.usuario}')">Eliminar</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="7" style="color:#ef4444">Error al cargar. Verifica la URL del API.</td></tr>'; }
+  }
+
+  async function crearUsuario() {
+    const usuario = document.getElementById('nu-usuario').value.trim();
+    if (!usuario) { alert('Escribe un nombre de usuario'); return; }
+    const r = await fetch(API + '/admin/usuarios', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        usuario,
+        paquete: document.getElementById('nu-paquete').value,
+        dias: document.getElementById('nu-dias').value
+      })
+    });
+    const d = await r.json();
+    if (!r.ok) { alert(d.error || 'Error al crear'); return; }
+    lastCreds = d;
+    const host = window.location.origin;
+    document.getElementById('c-url').textContent = `${host}/m3u/${d.usuario}?pass=${d.contrasena}`;
+    document.getElementById('c-user').textContent = d.usuario;
+    document.getElementById('c-pass').textContent = d.contrasena;
+    document.getElementById('c-pkg').textContent = d.paquete + ` (${d.max_conexiones} pantalla${d.max_conexiones>1?'s':''})`;
+    document.getElementById('c-exp').textContent = new Date(d.expira).toLocaleDateString('es-CO');
+    document.getElementById('modal-cred').classList.add('open');
+    document.getElementById('nu-usuario').value = '';
+  }
+
+  function copiarCreds() {
+    const host = window.location.origin;
+    const txt = `📺 Acceso StreamFlow\nURL M3U: ${host}/m3u/${lastCreds.usuario}?pass=${lastCreds.contrasena}\nUsuario: ${lastCreds.usuario}\nContraseña: ${lastCreds.contrasena}\nPaquete: ${lastCreds.paquete}\nExpira: ${new Date(lastCreds.expira).toLocaleDateString('es-CO')}`;
+    navigator.clipboard.writeText(txt).then(() => alert('✅ Copiado al portapapeles'));
+  }
+
+  function cerrarModal() { document.getElementById('modal-cred').classList.remove('open'); }
+
+  async function verMacs(uid, nombre) {
+    const r = await fetch(API + `/admin/usuarios/${uid}/macs`);
+    const macs = await r.json();
+    const lista = document.getElementById('lista-macs');
+    lista.innerHTML = macs.length ? macs.map(m => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#0f1117;border-radius:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:600">${m.nombre}</div>
+          <div style="font-size:12px;color:#64748b;font-family:monospace">${m.mac}</div>
+          <div style="font-size:11px;color:#475569">${new Date(m.registrada).toLocaleDateString('es-CO')}</div>
+        </div>
+        <button class="btn btn-sm btn-danger" onclick="revocarMac(${m.id})">Revocar</button>
+      </div>`).join('')
+    : '<p style="color:#64748b;font-size:13px">Sin dispositivos registrados</p>';
+    document.getElementById('modal-macs').classList.add('open');
+  }
+
+  async function revocarMac(mid) {
+    if (!confirm('¿Revocar este dispositivo?')) return;
+    await fetch(API + `/admin/macs/${mid}`, {method:'DELETE'});
+    document.getElementById('modal-macs').classList.remove('open');
+  }
+
+  async function renovar(uid) {
+    const dias = prompt('¿Cuántos días agregar?', '30');
+    if (!dias) return;
+    const r = await fetch(API + `/admin/usuarios/${uid}/renovar`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({dias})
+    });
+    const d = await r.json();
+    alert(`✅ Renovado hasta: ${new Date(d.expira).toLocaleDateString('es-CO')}`);
+    cargarUsuarios();
+  }
+
+  async function suspender(uid) {
+    await fetch(API + `/admin/usuarios/${uid}/suspender`, {method:'POST'});
+    cargarUsuarios();
+  }
+
+  async function eliminar(uid, nombre) {
+    if (!confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
+    await fetch(API + `/admin/usuarios/${uid}`, {method:'DELETE'});
+    cargarUsuarios();
+  }
+
+  cargarStats();
+</script>
+</body>
+</html>
