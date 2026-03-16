@@ -21,6 +21,10 @@ PAQUETES = {
     'familiar': {'max_conexiones': 3},
 }
 
+def get_host():
+    """Devuelve siempre https:// + dominio, ignorando lo que diga el proxy"""
+    return "https://" + request.host
+
 # ════════════════════════════════════════════════════════════════
 #  CONTROL DE ACCESO
 # ════════════════════════════════════════════════════════════════
@@ -114,12 +118,11 @@ def generar_m3u(usuario):
     if datetime.utcnow() > user.fecha_expira:
         return "Cuenta expirada", 403
 
-    # Descarga la M3U del proveedor y la re-sirve con tus URLs
     try:
         resp = requests.get(URL_M3U_PROVEEDOR, timeout=15)
         lineas = resp.text.splitlines()
         nueva_m3u = []
-        host = request.host_url.rstrip('/')
+        host = get_host()  # ← corregido
         i = 0
         while i < len(lineas):
             linea = lineas[i]
@@ -289,7 +292,7 @@ def player_api():
     if datetime.utcnow() > user.fecha_expira:
         return jsonify({"user_info": {"auth": 0}}), 401
 
-    host = request.host_url.rstrip('/')
+    host = get_host()  # ← corregido
     return jsonify({
         "user_info": {
             "auth": 1,
@@ -304,7 +307,7 @@ def player_api():
             "allowed_output_formats": ["m3u8", "ts"]
         },
         "server_info": {
-            "url": host,
+            "url": host,  # ← ahora es https://
             "port": "443",
             "https_port": "443",
             "server_protocol": "https",
@@ -338,7 +341,7 @@ def get_php():
     db.session.commit()
 
     try:
-        host    = request.host_url.rstrip('/')
+        host    = get_host()  # ← corregido
         content = generar_m3u_contenido(usuario, contrasena, host)
         return Response(content, content_type='application/x-mpegURL')
     except Exception:
