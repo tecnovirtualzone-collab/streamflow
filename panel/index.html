@@ -196,6 +196,7 @@
           <td style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
             <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="suspender(${u.id})">${u.activo?'Suspender':'Activar'}</button>
+            <button class="btn btn-sm" style="background:#0e7490;color:#fff" onclick="resetPass(${u.id},'${u.usuario}')">🔑 Reset</button>
             <button class="btn btn-sm btn-danger" onclick="eliminar(${u.id},'${u.usuario}')">Eliminar</button>
           </td>
         </tr>`;
@@ -219,7 +220,7 @@
     if (!r.ok) { alert(d.error || 'Error al crear'); return; }
     lastCreds = d;
     const host = window.location.origin;
-    document.getElementById('c-url').textContent = `${host}/m3u/${d.usuario}?pass=${d.contrasena}`;
+    document.getElementById('c-url').textContent = `${host}/get.php?username=${d.usuario}&password=${d.contrasena}`;
     document.getElementById('c-user').textContent = d.usuario;
     document.getElementById('c-pass').textContent = d.contrasena;
     document.getElementById('c-pkg').textContent = d.paquete + ` (${d.max_conexiones} pantalla${d.max_conexiones>1?'s':''})`;
@@ -230,7 +231,7 @@
 
   function copiarCreds() {
     const host = window.location.origin;
-    const txt = `📺 Acceso StreamFlow\nURL M3U: ${host}/m3u/${lastCreds.usuario}?pass=${lastCreds.contrasena}\nUsuario: ${lastCreds.usuario}\nContraseña: ${lastCreds.contrasena}\nPaquete: ${lastCreds.paquete}\nExpira: ${new Date(lastCreds.expira).toLocaleDateString('es-CO')}`;
+    const txt = `📺 *Acceso StreamFlow*\n*App:* IPTV Smarters Pro\n*URL:* ${host}\n*Usuario:* ${lastCreds.usuario}\n*Contraseña:* ${lastCreds.contrasena}\n*Paquete:* ${lastCreds.paquete}\n*Expira:* ${new Date(lastCreds.expira).toLocaleDateString('es-CO')}\n_Soporte vía WhatsApp_`;
     navigator.clipboard.writeText(txt).then(() => alert('✅ Copiado al portapapeles'));
   }
 
@@ -280,6 +281,22 @@
     if (!confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
     await fetch(API + `/admin/usuarios/${uid}`, {method:'DELETE'});
     cargarUsuarios();
+  }
+
+  async function resetPass(uid, nombre) {
+    if (!confirm(`¿Resetear contraseña de "${nombre}"? Se generará una nueva clave.`)) return;
+    const r = await fetch(API + `/admin/usuarios/${uid}/reset-password`, {method:'POST'});
+    const d = await r.json();
+    if (!r.ok) { alert('Error al resetear'); return; }
+    lastCreds = {...d, paquete: ''};
+    const host = window.location.origin;
+    document.getElementById('c-url').textContent = `${host}/get.php?username=${d.usuario}&password=${d.contrasena}`;
+    document.getElementById('c-user').textContent = d.usuario;
+    document.getElementById('c-pass').textContent = d.contrasena;
+    document.getElementById('c-pkg').textContent = 'Contraseña reseteada';
+    document.getElementById('c-exp').textContent = new Date(d.expira).toLocaleDateString('es-CO');
+    document.getElementById('modal-cred').querySelector('h3').textContent = '🔑 Contraseña reseteada';
+    document.getElementById('modal-cred').classList.add('open');
   }
 
   cargarStats();
