@@ -1,4 +1,4 @@
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response, jsonify, redirect
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -163,12 +163,7 @@ def stream_xtream(usuario, contrasena, canal):
     base = get_proveedor_base()
     prov_user, prov_pass = get_proveedor_creds()
     url_real = f"{base}/{ruta}/{prov_user}/{prov_pass}/{canal}"
-    try:
-        resp = requests.get(url_real, stream=True, timeout=10)
-        return Response(resp.iter_content(chunk_size=4096),
-                        content_type=resp.headers.get('Content-Type', 'video/mp2t'))
-    except:
-        return jsonify({'error': 'Error al conectar'}), 502
+    return redirect(url_real, code=302)
 
 @app.route('/stream')
 def stream():
@@ -183,12 +178,7 @@ def stream():
     base = get_proveedor_base()
     prov_user, prov_pass = get_proveedor_creds()
     url_real = f"{base}/live/{prov_user}/{prov_pass}/{canal}"
-    try:
-        resp = requests.get(url_real, stream=True, timeout=10)
-        return Response(resp.iter_content(chunk_size=4096),
-                        content_type=resp.headers.get('Content-Type', 'video/mp2t'))
-    except:
-        return jsonify({'error': 'Error al conectar'}), 502
+    return redirect(url_real, code=302)
 
 @app.route('/ping')
 def ping():
