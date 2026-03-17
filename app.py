@@ -1,4 +1,4 @@
-from flask import Flask, request, Response, jsonify, redirect
+from flask import Flask, request, Response, jsonify
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -163,7 +163,23 @@ def stream_xtream(usuario, contrasena, canal):
     base = get_proveedor_base()
     prov_user, prov_pass = get_proveedor_creds()
     url_real = f"{base}/{ruta}/{prov_user}/{prov_pass}/{canal}"
-    return redirect(url_real, code=302)
+    try:
+        resp = requests.get(url_real, stream=True, timeout=30,
+                            headers={'User-Agent': 'Mozilla/5.0'})
+        def generate():
+            for chunk in resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        return Response(
+            generate(),
+            content_type=resp.headers.get('Content-Type', 'video/mp2t'),
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+    except Exception as e:
+        return jsonify({'error': 'Error al conectar'}), 502
 
 @app.route('/stream')
 def stream():
@@ -178,7 +194,23 @@ def stream():
     base = get_proveedor_base()
     prov_user, prov_pass = get_proveedor_creds()
     url_real = f"{base}/live/{prov_user}/{prov_pass}/{canal}"
-    return redirect(url_real, code=302)
+    try:
+        resp = requests.get(url_real, stream=True, timeout=30,
+                            headers={'User-Agent': 'Mozilla/5.0'})
+        def generate():
+            for chunk in resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        return Response(
+            generate(),
+            content_type=resp.headers.get('Content-Type', 'video/mp2t'),
+            headers={
+                'Cache-Control': 'no-cache',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+    except Exception as e:
+        return jsonify({'error': 'Error al conectar'}), 502
 
 @app.route('/ping')
 def ping():
