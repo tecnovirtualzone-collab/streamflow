@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StreamFlow — Login</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh;display:flex;align-items:center;justify-content:center}
+  .card{background:#1a1d27;border-radius:16px;padding:40px;width:360px;border:1px solid #2d3148;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+  .logo{font-size:28px;font-weight:700;color:#6366f1;text-align:center;margin-bottom:8px}
+  .subtitle{text-align:center;color:#64748b;font-size:14px;margin-bottom:32px}
+  .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+  .field label{font-size:12px;color:#64748b}
+  input{background:#0f1117;border:1px solid #2d3148;color:#e2e8f0;padding:10px 14px;border-radius:8px;font-size:15px;outline:none;width:100%}
+  input:focus{border-color:#6366f1}
+  .btn{width:100%;padding:12px;border-radius:8px;border:none;cursor:pointer;font-size:15px;font-weight:600;background:#6366f1;color:#fff;margin-top:8px;transition:all .2s}
+  .btn:hover{background:#4f46e5}
+  .error{background:#450a0a;color:#f87171;border:1px solid #7f1d1d;padding:10px 14px;border-radius:8px;font-size:13px;margin-bottom:16px;display:none}
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo">⚡ StreamFlow</div>
+  <div class="subtitle">Panel de administración</div>
+  <div class="error" id="error-msg">Credenciales incorrectas</div>
+  <div class="field">
+    <label>Usuario</label>
+    <input id="usuario" type="text" placeholder="Usuario admin" autocomplete="username">
+  </div>
+  <div class="field">
+    <label>Contraseña</label>
+    <input id="password" type="password" placeholder="••••••••" autocomplete="current-password">
+  </div>
+  <button class="btn" onclick="login()">Entrar</button>
+</div>
+<script>
+  document.addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+
+  async function login() {
+    const usuario  = document.getElementById('usuario').value.trim();
+    const password = document.getElementById('password').value;
+    const err      = document.getElementById('error-msg');
+    err.style.display = 'none';
+
+    if (!usuario || !password) { err.textContent = 'Completa todos los campos'; err.style.display = 'block'; return; }
+
+    const r = await fetch('/panel/login', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({usuario, password})
+    });
+
+    if (r.ok) {
+      window.location.href = '/panel/';
+    } else {
+      err.textContent = 'Usuario o contraseña incorrectos';
+      err.style.display = 'block';
+      document.getElementById('password').value = '';
+    }
+  }
+</script>
+</body>
+</html>

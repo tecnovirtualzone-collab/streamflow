@@ -7,7 +7,7 @@
 <style>
   *{box-sizing:border-box;margin:0;padding:0}
   body{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;min-height:100vh}
-  .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#1a1d27;padding:24px 16px;display:flex;flex-direction:column;gap:8px}
+  .sidebar{position:fixed;left:0;top:0;width:220px;height:100vh;background:#1a1d27;padding:24px 16px;display:flex;flex-direction:column;gap:8px;justify-content:flex-start}
   .logo{font-size:20px;font-weight:700;color:#6366f1;margin-bottom:16px;padding:0 8px}
   .nav-btn{background:none;border:none;color:#94a3b8;padding:10px 12px;border-radius:8px;cursor:pointer;text-align:left;width:100%;font-size:14px;transition:all .2s}
   .nav-btn:hover,.nav-btn.active{background:#6366f1;color:#fff}
@@ -53,9 +53,13 @@
 
 <div class="sidebar">
   <div class="logo">⚡ StreamFlow</div>
+  <div style="margin-bottom:8px;padding:0 8px"><span style="font-size:11px;color:#475569">Panel Admin</span></div>
   <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
   <button class="nav-btn" onclick="showPage('usuarios')">👥 Usuarios</button>
   <button class="nav-btn" onclick="showPage('nuevo')">➕ Nuevo usuario</button>
+  <div style="margin-top:auto;padding-top:16px">
+    <button class="nav-btn" style="color:#ef4444" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
+  </div>
 </div>
 
 <div class="main">

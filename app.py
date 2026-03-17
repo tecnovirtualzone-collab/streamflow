@@ -1,4 +1,4 @@
-from flask import Flask, request, Response, jsonify
+from flask import Flask, request, Response, jsonify, session
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
@@ -8,12 +8,15 @@ from models import db, Usuario, MacRegistrada, SesionActiva
 
 app = Flask(__name__)
 CORS(app)
+app.secret_key = os.environ.get('SECRET_KEY', 'streamflow-secret-2026')
 
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'postgresql://postgres:postgres@localhost/streamflow')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 URL_M3U_PROVEEDOR = os.environ.get('URL_M3U', '')
+ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
+ADMIN_PASS = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # ════════════════════════════════════════════════════════════════
 #  HELPERS PROVEEDOR
@@ -288,6 +291,7 @@ def ping():
 # ════════════════════════════════════════════════════════════════
 
 @app.route('/admin/usuarios', methods=['GET'])
+@admin_requerido
 def listar_usuarios():
     users = Usuario.query.order_by(Usuario.creado.desc()).all()
     return jsonify([{
@@ -303,6 +307,7 @@ def listar_usuarios():
     } for u in users])
 
 @app.route('/admin/usuarios', methods=['POST'])
+@admin_requerido
 def crear_usuario():
     data    = request.json
     paquete = data.get('paquete', 'basico')
@@ -329,6 +334,7 @@ def crear_usuario():
     })
 
 @app.route('/admin/usuarios/<int:uid>', methods=['DELETE'])
+@admin_requerido
 def eliminar_usuario(uid):
     user = Usuario.query.get_or_404(uid)
     db.session.delete(user)
@@ -336,6 +342,7 @@ def eliminar_usuario(uid):
     return jsonify({'ok': True})
 
 @app.route('/admin/usuarios/<int:uid>/suspender', methods=['POST'])
+@admin_requerido
 def suspender_usuario(uid):
     user = Usuario.query.get_or_404(uid)
     user.activo = not user.activo
@@ -343,6 +350,7 @@ def suspender_usuario(uid):
     return jsonify({'activo': user.activo})
 
 @app.route('/admin/usuarios/<int:uid>/renovar', methods=['POST'])
+@admin_requerido
 def renovar_usuario(uid):
     data = request.json
     dias = int(data.get('dias', 30))
@@ -356,6 +364,7 @@ def renovar_usuario(uid):
     return jsonify({'expira': user.fecha_expira.isoformat()})
 
 @app.route('/admin/usuarios/<int:uid>/macs')
+@admin_requerido
 def ver_macs(uid):
     user = Usuario.query.get_or_404(uid)
     return jsonify([{
@@ -366,6 +375,7 @@ def ver_macs(uid):
     } for m in user.macs])
 
 @app.route('/admin/macs/<int:mid>', methods=['DELETE'])
+@admin_requerido
 def revocar_mac(mid):
     mac = MacRegistrada.query.get_or_404(mid)
     db.session.delete(mac)
@@ -373,6 +383,7 @@ def revocar_mac(mid):
     return jsonify({'ok': True})
 
 @app.route('/admin/usuarios/<int:uid>/reset-password', methods=['POST'])
+@admin_requerido
 def reset_password(uid):
     user = Usuario.query.get_or_404(uid)
     pwd  = secrets.token_urlsafe(8)
@@ -389,6 +400,7 @@ def reset_password(uid):
 # ════════════════════════════════════════════════════════════════
 
 @app.route('/admin/stats')
+@admin_requerido
 def stats():
     limpiar_sesiones()
     return jsonify({
@@ -403,11 +415,48 @@ def stats():
 # ════════════════════════════════════════════════════════════════
 
 # ════════════════════════════════════════════════════════════════
+#  AUTENTICACION PANEL ADMIN
+# ════════════════════════════════════════════════════════════════
+
+def admin_requerido(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('admin_logged'):
+            if request.is_json or request.path.startswith('/admin/'):
+                return jsonify({'error': 'No autorizado'}), 401
+            from flask import redirect as r
+            return r('/panel/login')
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/panel/login', methods=['GET'])
+def panel_login():
+    from flask import send_from_directory
+    return send_from_directory('panel', 'login.html')
+
+@app.route('/panel/login', methods=['POST'])
+def panel_login_post():
+    from flask import redirect as r
+    data = request.json or {}
+    if data.get('usuario') == ADMIN_USER and data.get('password') == ADMIN_PASS:
+        session['admin_logged'] = True
+        return jsonify({'ok': True})
+    return jsonify({'error': 'Credenciales incorrectas'}), 401
+
+@app.route('/panel/logout')
+def panel_logout():
+    from flask import redirect as r
+    session.clear()
+    return r('/panel/login')
+
+# ════════════════════════════════════════════════════════════════
 #  PANEL ADMIN — FRONTEND
 # ════════════════════════════════════════════════════════════════
 
 @app.route('/panel/')
 @app.route('/panel')
+@admin_requerido
 def panel():
     from flask import send_from_directory
     return send_from_directory('panel', 'index.html')
