@@ -19,6 +19,42 @@ ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('ADMIN_PASSWORD', 'admin123')
 
 # ════════════════════════════════════════════════════════════════
+#  AUTENTICACION PANEL ADMIN
+# ════════════════════════════════════════════════════════════════
+
+def admin_requerido(f):
+    from functools import wraps
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get('admin_logged'):
+            if request.is_json or request.path.startswith('/admin/'):
+                return jsonify({'error': 'No autorizado'}), 401
+            from flask import redirect as r
+            return r('/panel/login')
+        return f(*args, **kwargs)
+    return decorated
+
+@app.route('/panel/login', methods=['GET'])
+def panel_login():
+    from flask import send_from_directory
+    return send_from_directory('panel', 'login.html')
+
+@app.route('/panel/login', methods=['POST'])
+def panel_login_post():
+    from flask import redirect as r
+    data = request.json or {}
+    if data.get('usuario') == ADMIN_USER and data.get('password') == ADMIN_PASS:
+        session['admin_logged'] = True
+        return jsonify({'ok': True})
+    return jsonify({'error': 'Credenciales incorrectas'}), 401
+
+@app.route('/panel/logout')
+def panel_logout():
+    from flask import redirect as r
+    session.clear()
+    return r('/panel/login')
+
+# ════════════════════════════════════════════════════════════════
 #  HELPERS PROVEEDOR
 # ════════════════════════════════════════════════════════════════
 
@@ -415,40 +451,7 @@ def stats():
 # ════════════════════════════════════════════════════════════════
 
 # ════════════════════════════════════════════════════════════════
-#  AUTENTICACION PANEL ADMIN
-# ════════════════════════════════════════════════════════════════
-
-def admin_requerido(f):
-    from functools import wraps
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        if not session.get('admin_logged'):
-            if request.is_json or request.path.startswith('/admin/'):
-                return jsonify({'error': 'No autorizado'}), 401
-            from flask import redirect as r
-            return r('/panel/login')
-        return f(*args, **kwargs)
-    return decorated
-
-@app.route('/panel/login', methods=['GET'])
-def panel_login():
-    from flask import send_from_directory
-    return send_from_directory('panel', 'login.html')
-
-@app.route('/panel/login', methods=['POST'])
-def panel_login_post():
-    from flask import redirect as r
-    data = request.json or {}
-    if data.get('usuario') == ADMIN_USER and data.get('password') == ADMIN_PASS:
-        session['admin_logged'] = True
-        return jsonify({'ok': True})
-    return jsonify({'error': 'Credenciales incorrectas'}), 401
-
-@app.route('/panel/logout')
-def panel_logout():
-    from flask import redirect as r
-    session.clear()
-    return r('/panel/login')
+#  PANEL ADMIN — FRONTEND (auth defined above)
 
 # ════════════════════════════════════════════════════════════════
 #  PANEL ADMIN — FRONTEND
