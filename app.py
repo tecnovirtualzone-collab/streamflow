@@ -390,6 +390,16 @@ def stats():
 #  INICIO
 # ════════════════════════════════════════════════════════════════
 
+# ════════════════════════════════════════════════════════════════
+#  PANEL ADMIN — FRONTEND
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/panel/')
+@app.route('/panel')
+def panel():
+    from flask import send_from_directory
+    return send_from_directory('panel', 'index.html')
+
 with app.app_context():
     db.create_all()
 
