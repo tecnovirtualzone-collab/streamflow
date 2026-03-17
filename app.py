@@ -372,6 +372,18 @@ def revocar_mac(mid):
     db.session.commit()
     return jsonify({'ok': True})
 
+@app.route('/admin/usuarios/<int:uid>/reset-password', methods=['POST'])
+def reset_password(uid):
+    user = Usuario.query.get_or_404(uid)
+    pwd  = secrets.token_urlsafe(8)
+    user.contrasena = generate_password_hash(pwd)
+    db.session.commit()
+    return jsonify({
+        'usuario':  user.usuario,
+        'contrasena': pwd,
+        'expira':   user.fecha_expira.isoformat()
+    })
+
 # ════════════════════════════════════════════════════════════════
 #  ESTADÍSTICAS
 # ════════════════════════════════════════════════════════════════
