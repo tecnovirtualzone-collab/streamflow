@@ -59,6 +59,7 @@
   <button class="nav-btn" onclick="showPage('usuarios')">👥 Usuarios</button>
   <button class="nav-btn" onclick="showPage('nuevo')">➕ Nuevo usuario</button>
   <button class="nav-btn" onclick="showPage('logs')">📋 Logs de acceso</button>
+  <button class="nav-btn" onclick="showPage('clientes')">👤 Clientes CRM</button>
   <div style="margin-top:auto;padding-top:16px">
     <button class="nav-btn" style="color:#ef4444" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
   </div>
@@ -167,9 +168,25 @@
       </div>
       <table>
         <thead>
-          <tr><th>Usuario</th><th>Canal ID</th><th>IP</th><th>Fecha</th></tr>
+          <tr><th>#</th><th>Usuario</th><th>Canal ID</th><th>IP</th><th>Fecha</th></tr>
         </thead>
-        <tbody id="tabla-logs"><tr><td colspan="4" style="color:#64748b">Cargando...</td></tr></tbody>
+        <tbody id="tabla-logs"><tr><td colspan="5" style="color:#64748b">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- CLIENTES CRM -->
+  <div class="page" id="page-clientes">
+    <h1>👤 Clientes CRM</h1>
+    <div class="card">
+      <table>
+        <thead>
+          <tr>
+            <th>Usuario</th><th>WhatsApp</th><th>Paquete</th><th>Estado</th>
+            <th>Expira en</th><th>Total pagado</th><th>Último acceso</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tabla-crm"><tr><td colspan="8" style="color:#64748b">Cargando...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -225,6 +242,7 @@
     if (p === 'dashboard') cargarStats();
     if (p === 'usuarios') cargarUsuarios();
     if (p === 'logs') cargarLogs();
+    if (p === 'clientes') cargarCRM();
   }
 
   let chartIngresosInst = null;
@@ -453,9 +471,10 @@
       const r = await fetch(API + '/admin/logs');
       const logs = await r.json();
       if (!logs.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b">Sin logs aún</td></tr>'; return; }
-      tbody.innerHTML = logs.map(l => `<tr>
+      tbody.innerHTML = logs.map((l,i) => `<tr>
+        <td style="color:#475569;font-size:12px">${i+1}</td>
         <td><strong>${l.usuario}</strong></td>
-        <td style="font-family:monospace;color:#6366f1">${l.canal}</td>
+        <td style="font-family:monospace;color:#6366f1;font-size:12px">${l.canal}</td>
         <td style="color:#64748b;font-size:12px">${l.ip}</td>
         <td style="color:#64748b;font-size:12px">${new Date(l.fecha).toLocaleString('es-CO')}</td>
       </tr>`).join('');
@@ -477,6 +496,60 @@
         </div>
         <span style="color:#64748b;font-size:12px">${new Date(l.fecha).toLocaleString('es-CO')}</span>
       </div>`).join('');
+  }
+
+  async function cargarCRM() {
+    const tbody = document.getElementById('tabla-crm');
+    tbody.innerHTML = '<tr><td colspan="8" style="color:#64748b">Cargando...</td></tr>';
+    try {
+      const [rUsers, rLogs] = await Promise.all([
+        fetch(API + '/admin/usuarios'),
+        fetch(API + '/admin/logs')
+      ]);
+      const users = await rUsers.json();
+      const logs  = await rLogs.json();
+
+      // Last access per user
+      const ultimoAcceso = {};
+      logs.forEach(l => { if (!ultimoAcceso[l.usuario]) ultimoAcceso[l.usuario] = l.fecha; });
+
+      // Total paid per user
+      const pagosUser = {};
+      await Promise.all(users.map(async u => {
+        const r = await fetch(API + `/admin/usuarios/${u.id}/pagos`);
+        const p = await r.json();
+        pagosUser[u.id] = p.reduce((s, x) => s + x.monto, 0);
+      }));
+
+      tbody.innerHTML = users.map(u => {
+        const estado = !u.activo ? '<span class="badge badge-red">Suspendido</span>'
+          : u.expira_en_dias <= 0 ? '<span class="badge badge-yellow">Expirado</span>'
+          : u.expira_en_dias <= 5 ? '<span class="badge badge-yellow">⚠️ Por vencer</span>'
+          : '<span class="badge badge-green">Activo</span>';
+        const ultimo = ultimoAcceso[u.usuario] ? new Date(ultimoAcceso[u.usuario]).toLocaleDateString('es-CO') : '—';
+        const total  = pagosUser[u.id] ? '$' + pagosUser[u.id].toLocaleString('es-CO') : '—';
+        const wa     = u.notas ? `<a href="https://wa.me/${u.notas.replace(/[^0-9]/g,'')}" target="_blank" style="color:#25d366">📱 ${u.notas}</a>` : '<span style="color:#475569">—</span>';
+        return `<tr>
+          <td><strong>${u.usuario}</strong></td>
+          <td>${wa}</td>
+          <td>${u.paquete}</td>
+          <td>${estado}</td>
+          <td>${u.expira_en_dias > 0 ? u.expira_en_dias + ' días' : 'Expirado'}</td>
+          <td style="color:#34d399;font-weight:600">${total}</td>
+          <td style="color:#64748b;font-size:12px">${ultimo}</td>
+          <td style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-sm" style="background:#25d366;color:#fff" onclick="abrirWA('${u.notas || ''}')">💬 WA</button>
+            <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
+          </td>
+        </tr>`;
+      }).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="8" style="color:#ef4444">Error al cargar</td></tr>'; }
+  }
+
+  function abrirWA(numero) {
+    const n = numero.replace(/[^0-9]/g, '');
+    if (!n) { alert('Este cliente no tiene WhatsApp registrado'); return; }
+    window.open('https://wa.me/' + n, '_blank');
   }
 
   cargarStats();
