@@ -13,6 +13,7 @@ class Usuario(db.Model):
     fecha_expira   = db.Column(db.DateTime, nullable=False)
     activo         = db.Column(db.Boolean, default=True)
     creado         = db.Column(db.DateTime, default=datetime.utcnow)
+    notas          = db.Column(db.String(300), default='')
     macs           = db.relationship('MacRegistrada', backref='usuario', lazy=True, cascade='all, delete-orphan')
     sesiones       = db.relationship('SesionActiva', backref='usuario', lazy=True, cascade='all, delete-orphan')
 

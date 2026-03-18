@@ -87,7 +87,7 @@
         <thead>
           <tr>
             <th>Usuario</th><th>Paquete</th><th>Estado</th>
-            <th>Expira en</th><th>Conexiones</th><th>MACs</th><th>Acciones</th>
+            <th>Expira en</th><th>Conexiones</th><th>MACs</th><th>Notas</th><th>Acciones</th>
           </tr>
         </thead>
         <tbody id="tabla-usuarios"><tr><td colspan="7" style="color:#64748b">Cargando...</td></tr></tbody>
@@ -120,6 +120,10 @@
             <option value="90">90 días</option>
             <option value="365">1 año</option>
           </select>
+        </div>
+        <div class="field">
+          <label>Notas (teléfono, nombre real, etc.)</label>
+          <input id="nu-notas" placeholder="ej: +57 300 123 4567" style="width:250px">
         </div>
         <button class="btn btn-primary" onclick="crearUsuario()">Crear usuario</button>
       </div>
@@ -197,6 +201,7 @@
           <td>${expira}</td>
           <td>${u.conexiones_activas} / ${u.max_conexiones}</td>
           <td><button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="verMacs(${u.id},'${u.usuario}')">${u.macs_registradas} MACs</button></td>
+          <td><span style="color:#94a3b8;font-size:12px;cursor:pointer" onclick="editarNotas(${u.id},'${u.notas || ''}')" title="Clic para editar">${u.notas ? u.notas.substring(0,25)+(u.notas.length>25?'...':'') : '<span style=\"color:#475569\">—</span>'}</span></td>
           <td style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
             <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="suspender(${u.id})">${u.activo?'Suspender':'Activar'}</button>
@@ -231,6 +236,7 @@
     document.getElementById('c-exp').textContent = new Date(d.expira).toLocaleDateString('es-CO');
     document.getElementById('modal-cred').classList.add('open');
     document.getElementById('nu-usuario').value = '';
+    document.getElementById('nu-notas').value = '';
   }
 
   function copiarCreds() {
@@ -284,6 +290,17 @@
   async function eliminar(uid, nombre) {
     if (!confirm(`¿Eliminar al usuario "${nombre}"? Esta acción no se puede deshacer.`)) return;
     await fetch(API + `/admin/usuarios/${uid}`, {method:'DELETE'});
+    cargarUsuarios();
+  }
+
+  async function editarNotas(uid, notasActuales) {
+    const nuevasNotas = prompt('Notas del cliente (teléfono, nombre, etc.):', notasActuales);
+    if (nuevasNotas === null) return;
+    await fetch(API + `/admin/usuarios/${uid}/notas`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({notas: nuevasNotas})
+    });
     cargarUsuarios();
   }
 

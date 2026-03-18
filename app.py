@@ -339,7 +339,8 @@ def listar_usuarios():
         'expira':             u.fecha_expira.isoformat(),
         'expira_en_dias':     max(0, (u.fecha_expira - datetime.utcnow()).days),
         'conexiones_activas': len(u.sesiones),
-        'macs_registradas':   len(u.macs)
+        'macs_registradas':   len(u.macs),
+        'notas':              u.notas or ''
     } for u in users])
 
 @app.route('/admin/usuarios', methods=['POST'])
@@ -357,7 +358,8 @@ def crear_usuario():
         contrasena     = generate_password_hash(pwd),
         paquete        = paquete,
         max_conexiones = config['max_conexiones'],
-        fecha_expira   = datetime.utcnow() + timedelta(days=dias)
+        fecha_expira   = datetime.utcnow() + timedelta(days=dias),
+        notas          = data.get('notas', '')
     )
     db.session.add(user)
     db.session.commit()
@@ -415,6 +417,14 @@ def ver_macs(uid):
 def revocar_mac(mid):
     mac = MacRegistrada.query.get_or_404(mid)
     db.session.delete(mac)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/admin/usuarios/<int:uid>/notas', methods=['POST'])
+@admin_requerido
+def actualizar_notas(uid):
+    user = Usuario.query.get_or_404(uid)
+    user.notas = request.json.get('notas', '')
     db.session.commit()
     return jsonify({'ok': True})
 
