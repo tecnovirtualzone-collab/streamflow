@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 import requests, secrets, os
-from models import db, Usuario, MacRegistrada, SesionActiva, Pago
+from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
 
 app = Flask(__name__)
 CORS(app)
@@ -243,6 +243,15 @@ def stream_xtream(usuario, contrasena, canal):
     if not ok:
         return jsonify({'error': resultado}), 403
 
+    # Registrar log de acceso
+    if user_obj:
+        try:
+            log = LogAcceso(usuario_id=user_obj.id, canal=canal, ip=ip)
+            db.session.add(log)
+            db.session.commit()
+        except Exception:
+            pass
+
     base_prov, prov_user, prov_pass = get_proveedor_info()
     url_real = f"{base_prov}/{ruta}/{prov_user}/{prov_pass}/{canal}"
 
@@ -440,6 +449,31 @@ def reset_password(uid):
         'contrasena': pwd,
         'expira':   user.fecha_expira.isoformat()
     })
+
+# ════════════════════════════════════════════════════════════════
+#  LOGS DE ACCESO
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/admin/usuarios/<int:uid>/logs')
+@admin_requerido
+def ver_logs(uid):
+    logs = LogAcceso.query.filter_by(usuario_id=uid).order_by(LogAcceso.fecha.desc()).limit(50).all()
+    return jsonify([{
+        'canal': l.canal,
+        'ip':    l.ip,
+        'fecha': l.fecha.isoformat()
+    } for l in logs])
+
+@app.route('/admin/logs')
+@admin_requerido
+def todos_logs():
+    logs = LogAcceso.query.order_by(LogAcceso.fecha.desc()).limit(100).all()
+    return jsonify([{
+        'usuario': Usuario.query.get(l.usuario_id).usuario if Usuario.query.get(l.usuario_id) else '?',
+        'canal':   l.canal,
+        'ip':      l.ip,
+        'fecha':   l.fecha.isoformat()
+    } for l in logs])
 
 # ════════════════════════════════════════════════════════════════
 #  PAGOS

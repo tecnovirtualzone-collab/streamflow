@@ -17,6 +17,7 @@ class Usuario(db.Model):
     macs           = db.relationship('MacRegistrada', backref='usuario', lazy=True, cascade='all, delete-orphan')
     sesiones       = db.relationship('SesionActiva', backref='usuario', lazy=True, cascade='all, delete-orphan')
     pagos          = db.relationship('Pago', backref='usuario', lazy=True, cascade='all, delete-orphan')
+    logs           = db.relationship('LogAcceso', backref='usuario', lazy=True, cascade='all, delete-orphan')
 
 class MacRegistrada(db.Model):
     __tablename__ = 'macs'
@@ -25,6 +26,14 @@ class MacRegistrada(db.Model):
     mac        = db.Column(db.String(17), nullable=False)
     nombre     = db.Column(db.String(50), default='Dispositivo')
     registrada = db.Column(db.DateTime, default=datetime.utcnow)
+
+class LogAcceso(db.Model):
+    __tablename__ = 'logs_acceso'
+    id          = db.Column(db.Integer, primary_key=True)
+    usuario_id  = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    canal       = db.Column(db.String(200))
+    ip          = db.Column(db.String(45))
+    fecha       = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Pago(db.Model):
     __tablename__ = 'pagos'

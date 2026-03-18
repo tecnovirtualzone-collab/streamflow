@@ -58,6 +58,7 @@
   <button class="nav-btn active" onclick="showPage('dashboard')">📊 Dashboard</button>
   <button class="nav-btn" onclick="showPage('usuarios')">👥 Usuarios</button>
   <button class="nav-btn" onclick="showPage('nuevo')">➕ Nuevo usuario</button>
+  <button class="nav-btn" onclick="showPage('logs')">📋 Logs de acceso</button>
   <div style="margin-top:auto;padding-top:16px">
     <button class="nav-btn" style="color:#ef4444" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
   </div>
@@ -155,6 +156,27 @@
   </div>
 </div>
 
+<!-- LOGS PAGE -->
+<div class="page" id="page-logs" style="display:none">
+</div>
+
+  <!-- LOGS -->
+  <div class="page" id="page-logs">
+    <h1>📋 Logs de acceso</h1>
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <span style="color:#64748b;font-size:13px">Últimas 100 reproducciones</span>
+        <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="cargarLogs()">🔄 Actualizar</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Usuario</th><th>Canal ID</th><th>IP</th><th>Fecha</th></tr>
+        </thead>
+        <tbody id="tabla-logs"><tr><td colspan="4" style="color:#64748b">Cargando...</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
 <!-- MODAL PAGOS -->
 <div class="modal" id="modal-pagos">
   <div class="modal-box" style="width:520px;max-height:80vh;overflow-y:auto">
@@ -173,6 +195,15 @@
     </div>
     <div id="lista-pagos"></div>
     <button class="btn" style="width:100%;background:#2d3148;color:#e2e8f0;margin-top:12px" onclick="document.getElementById('modal-pagos').classList.remove('open')">Cerrar</button>
+  </div>
+</div>
+
+<!-- MODAL LOGS USUARIO -->
+<div class="modal" id="modal-logs-user">
+  <div class="modal-box" style="width:540px;max-height:80vh;overflow-y:auto">
+    <h3>📋 Logs — <span id="logs-user-nombre"></span></h3>
+    <div id="lista-logs-user" style="margin:16px 0"></div>
+    <button class="btn" style="width:100%;background:#2d3148;color:#e2e8f0" onclick="document.getElementById('modal-logs-user').classList.remove('open')">Cerrar</button>
   </div>
 </div>
 
@@ -196,6 +227,7 @@
     event.target.classList.add('active');
     if (p === 'dashboard') cargarStats();
     if (p === 'usuarios') cargarUsuarios();
+    if (p === 'logs') cargarLogs();
   }
 
   let chartIngresosInst = null;
@@ -247,6 +279,7 @@
           <td style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
             <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="suspender(${u.id})">${u.activo?'Suspender':'Activar'}</button>
+            <button class="btn btn-sm" style="background:#1e3a5f;color:#fff" onclick="verLogsUsuario(${u.id},'${u.usuario}')">📋 Logs</button>
             <button class="btn btn-sm" style="background:#065f46;color:#fff" onclick="verPagos(${u.id},'${u.usuario}')">💰 Pagos</button>
             <button class="btn btn-sm" style="background:#0e7490;color:#fff" onclick="resetPass(${u.id},'${u.usuario}')">🔑 Reset</button>
             <button class="btn btn-sm btn-danger" onclick="eliminar(${u.id},'${u.usuario}')">Eliminar</button>
@@ -413,6 +446,47 @@
     await fetch(API + `/admin/pagos/${pid}`, {method: 'DELETE'});
     await recargarPagos();
     cargarStats();
+  }
+
+  async function cargarLogs() {
+    const tbody = document.getElementById('tabla-logs');
+    if (!tbody) return;
+    tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b">Cargando...</td></tr>';
+    try {
+      const r = await fetch(API + '/admin/logs');
+      const logs = await r.json();
+      if (!logs.length) { tbody.innerHTML = '<tr><td colspan="4" style="color:#64748b">Sin logs aún</td></tr>'; return; }
+      tbody.innerHTML = logs.map(l => `<tr>
+        <td><strong>${l.usuario}</strong></td>
+        <td style="font-family:monospace;color:#6366f1">${l.canal}</td>
+        <td style="color:#64748b;font-size:12px">${l.ip}</td>
+        <td style="color:#64748b;font-size:12px">${new Date(l.fecha).toLocaleString('es-CO')}</td>
+      </tr>`).join('');
+    } catch(e) { tbody.innerHTML = '<tr><td colspan="4" style="color:#ef4444">Error al cargar</td></tr>'; }
+  }
+
+  async function verLogsUsuario(uid, nombre) {
+    document.getElementById('logs-user-nombre').textContent = nombre;
+    document.getElementById('modal-logs-user').classList.add('open');
+    const r = await fetch(API + `/admin/usuarios/${uid}/logs`);
+    const logs = await r.json();
+    const lista = document.getElementById('lista-logs-user');
+    if (!logs.length) { lista.innerHTML = '<p style="color:#64748b;font-size:13px">Sin actividad registrada</p>'; return; }
+    lista.innerHTML = logs.map(l => `
+      <div style="padding:8px 12px;background:#0f1117;border-radius:8px;margin-bottom:6px;display:flex;justify-content:space-between">
+        <div>
+          <span style="font-family:monospace;color:#6366f1">${l.canal}</span>
+          <span style="color:#475569;font-size:11px;margin-left:8px">${l.ip}</span>
+        </div>
+        <span style="color:#64748b;font-size:12px">${new Date(l.fecha).toLocaleString('es-CO')}</span>
+      </div>`).join('');
+  }
+
+  // Override showPage to load logs
+  const _showPage = showPage;
+  function showPage(p) {
+    _showPage(p);
+    if (p === 'logs') cargarLogs();
   }
 
   cargarStats();
