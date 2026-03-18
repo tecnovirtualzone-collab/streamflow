@@ -619,8 +619,11 @@ def wa_notify_expiring():
 
 @app.route('/wa/qr')
 def wa_qr():
-    from flask import redirect as redir
-    return redir(f"{WA_SERVICE_URL}/qr")
+    try:
+        resp = requests.get(f"{WA_SERVICE_URL}/qr", timeout=10)
+        return Response(resp.content, content_type=resp.headers.get('Content-Type', 'text/html'))
+    except Exception:
+        return "<h2 style='font-family:sans-serif;color:#ef4444;padding:40px'>Servicio WhatsApp iniciando... espera unos segundos y recarga.</h2>", 503
 
 @app.route('/panel/')
 @app.route('/panel')
