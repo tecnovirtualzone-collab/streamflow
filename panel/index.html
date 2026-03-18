@@ -482,13 +482,6 @@
       </div>`).join('');
   }
 
-  // Override showPage to load logs
-  const _showPage = showPage;
-  function showPage(p) {
-    _showPage(p);
-    if (p === 'logs') cargarLogs();
-  }
-
   cargarStats();
 </script>
 </body>
