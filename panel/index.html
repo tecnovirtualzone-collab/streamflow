@@ -48,6 +48,7 @@
   .alert{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:13px}
   .alert-info{background:#1e3a5f;color:#93c5fd;border:1px solid #1d4ed8}
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -72,6 +73,11 @@
       <div class="stat-card"><div class="stat-val" id="s-activos">—</div><div class="stat-label">Activos</div></div>
       <div class="stat-card"><div class="stat-val" id="s-online">—</div><div class="stat-label">Online ahora</div></div>
       <div class="stat-card"><div class="stat-val" id="s-expirados">—</div><div class="stat-label">Expirados</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-ingresos" style="color:#34d399">—</div><div class="stat-label">Ingresos este mes</div></div>
+    </div>
+    <div class="card">
+      <h2>💰 Ingresos últimos 6 meses</h2>
+      <canvas id="chart-ingresos" height="80"></canvas>
     </div>
     <div class="card">
       <h2>Estado del sistema</h2>
@@ -149,6 +155,27 @@
   </div>
 </div>
 
+<!-- MODAL PAGOS -->
+<div class="modal" id="modal-pagos">
+  <div class="modal-box" style="width:520px;max-height:80vh;overflow-y:auto">
+    <h3>💰 Historial de pagos — <span id="pagos-nombre"></span></h3>
+    <div style="display:flex;gap:8px;margin:16px 0;flex-wrap:wrap">
+      <input id="pago-monto" type="number" placeholder="Monto ($)" style="width:120px">
+      <select id="pago-metodo" style="width:130px">
+        <option>Efectivo</option>
+        <option>Nequi</option>
+        <option>Daviplata</option>
+        <option>Bancolombia</option>
+        <option>Transferencia</option>
+      </select>
+      <input id="pago-notas" placeholder="Notas opcionales" style="flex:1;min-width:120px">
+      <button class="btn btn-primary btn-sm" onclick="registrarPago()">+ Registrar</button>
+    </div>
+    <div id="lista-pagos"></div>
+    <button class="btn" style="width:100%;background:#2d3148;color:#e2e8f0;margin-top:12px" onclick="document.getElementById('modal-pagos').classList.remove('open')">Cerrar</button>
+  </div>
+</div>
+
 <!-- MODAL MACs -->
 <div class="modal" id="modal-macs">
   <div class="modal-box" style="width:480px">
@@ -171,6 +198,7 @@
     if (p === 'usuarios') cargarUsuarios();
   }
 
+  let chartIngresosInst = null;
   async function cargarStats() {
     try {
       const r = await fetch(API + '/admin/stats');
@@ -179,6 +207,20 @@
       document.getElementById('s-activos').textContent = d.usuarios_activos;
       document.getElementById('s-online').textContent = d.online_ahora;
       document.getElementById('s-expirados').textContent = d.usuarios_expirados;
+      document.getElementById('s-ingresos').textContent = '$' + (d.ingresos_mes || 0).toLocaleString('es-CO');
+    } catch(e) {}
+    try {
+      const r2 = await fetch(API + '/admin/resumen-pagos');
+      const d2 = await r2.json();
+      const labels = Object.keys(d2.por_mes).map(k => { const [y,m] = k.split('-'); return new Date(y,m-1).toLocaleString('es-CO',{month:'short',year:'2-digit'}); });
+      const values = Object.values(d2.por_mes);
+      const ctx = document.getElementById('chart-ingresos').getContext('2d');
+      if (chartIngresosInst) chartIngresosInst.destroy();
+      chartIngresosInst = new Chart(ctx, {
+        type: 'bar',
+        data: { labels, datasets: [{ label: 'Ingresos ($)', data: values, backgroundColor: '#6366f1', borderRadius: 6 }] },
+        options: { plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#94a3b8' }, grid: { color: '#2d3148' } }, y: { ticks: { color: '#94a3b8' }, grid: { color: '#2d3148' } } } }
+      });
     } catch(e) {}
   }
 
@@ -205,6 +247,7 @@
           <td style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-sm btn-warn" onclick="renovar(${u.id})">Renovar</button>
             <button class="btn btn-sm" style="background:#2d3148;color:#e2e8f0" onclick="suspender(${u.id})">${u.activo?'Suspender':'Activar'}</button>
+            <button class="btn btn-sm" style="background:#065f46;color:#fff" onclick="verPagos(${u.id},'${u.usuario}')">💰 Pagos</button>
             <button class="btn btn-sm" style="background:#0e7490;color:#fff" onclick="resetPass(${u.id},'${u.usuario}')">🔑 Reset</button>
             <button class="btn btn-sm btn-danger" onclick="eliminar(${u.id},'${u.usuario}')">Eliminar</button>
           </td>
@@ -318,6 +361,58 @@
     document.getElementById('c-exp').textContent = new Date(d.expira).toLocaleDateString('es-CO');
     document.getElementById('modal-cred').querySelector('h3').textContent = '🔑 Contraseña reseteada';
     document.getElementById('modal-cred').classList.add('open');
+  }
+
+  let pagoUsuarioId = null;
+
+  async function verPagos(uid, nombre) {
+    pagoUsuarioId = uid;
+    document.getElementById('pagos-nombre').textContent = nombre;
+    document.getElementById('modal-pagos').classList.add('open');
+    await recargarPagos();
+  }
+
+  async function recargarPagos() {
+    const r = await fetch(API + `/admin/usuarios/${pagoUsuarioId}/pagos`);
+    const pagos = await r.json();
+    const lista = document.getElementById('lista-pagos');
+    if (!pagos.length) { lista.innerHTML = '<p style="color:#64748b;font-size:13px">Sin pagos registrados</p>'; return; }
+    const total = pagos.reduce((s, p) => s + p.monto, 0);
+    lista.innerHTML = `<div style="text-align:right;color:#34d399;font-weight:700;margin-bottom:8px">Total: $${total.toLocaleString('es-CO')}</div>` +
+      pagos.map(p => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:#0f1117;border-radius:8px;margin-bottom:6px">
+          <div>
+            <div style="font-weight:600;color:#34d399">$${p.monto.toLocaleString('es-CO')} <span style="color:#64748b;font-weight:400;font-size:12px">— ${p.metodo}</span></div>
+            ${p.notas ? `<div style="font-size:12px;color:#94a3b8">${p.notas}</div>` : ''}
+            <div style="font-size:11px;color:#475569">${new Date(p.fecha).toLocaleDateString('es-CO')}</div>
+          </div>
+          <button class="btn btn-sm btn-danger" onclick="eliminarPago(${p.id})">✕</button>
+        </div>`).join('');
+  }
+
+  async function registrarPago() {
+    const monto = parseFloat(document.getElementById('pago-monto').value);
+    if (!monto || monto <= 0) { alert('Ingresa un monto válido'); return; }
+    await fetch(API + `/admin/usuarios/${pagoUsuarioId}/pagos`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        monto,
+        metodo: document.getElementById('pago-metodo').value,
+        notas: document.getElementById('pago-notas').value
+      })
+    });
+    document.getElementById('pago-monto').value = '';
+    document.getElementById('pago-notas').value = '';
+    await recargarPagos();
+    cargarStats();
+  }
+
+  async function eliminarPago(pid) {
+    if (!confirm('¿Eliminar este pago?')) return;
+    await fetch(API + `/admin/pagos/${pid}`, {method: 'DELETE'});
+    await recargarPagos();
+    cargarStats();
   }
 
   cargarStats();

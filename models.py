@@ -16,6 +16,7 @@ class Usuario(db.Model):
     notas          = db.Column(db.String(300), default='')
     macs           = db.relationship('MacRegistrada', backref='usuario', lazy=True, cascade='all, delete-orphan')
     sesiones       = db.relationship('SesionActiva', backref='usuario', lazy=True, cascade='all, delete-orphan')
+    pagos          = db.relationship('Pago', backref='usuario', lazy=True, cascade='all, delete-orphan')
 
 class MacRegistrada(db.Model):
     __tablename__ = 'macs'
@@ -24,6 +25,15 @@ class MacRegistrada(db.Model):
     mac        = db.Column(db.String(17), nullable=False)
     nombre     = db.Column(db.String(50), default='Dispositivo')
     registrada = db.Column(db.DateTime, default=datetime.utcnow)
+
+class Pago(db.Model):
+    __tablename__ = 'pagos'
+    id          = db.Column(db.Integer, primary_key=True)
+    usuario_id  = db.Column(db.Integer, db.ForeignKey('usuarios.id'), nullable=False)
+    monto       = db.Column(db.Float, nullable=False)
+    metodo      = db.Column(db.String(50), default='Efectivo')
+    notas       = db.Column(db.String(200), default='')
+    fecha       = db.Column(db.DateTime, default=datetime.utcnow)
 
 class SesionActiva(db.Model):
     __tablename__ = 'sesiones'

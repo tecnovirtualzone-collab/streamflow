@@ -4,7 +4,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 import requests, secrets, os
-from models import db, Usuario, MacRegistrada, SesionActiva
+from models import db, Usuario, MacRegistrada, SesionActiva, Pago
 
 app = Flask(__name__)
 CORS(app)
@@ -442,6 +442,64 @@ def reset_password(uid):
     })
 
 # ════════════════════════════════════════════════════════════════
+#  PAGOS
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/admin/usuarios/<int:uid>/pagos', methods=['GET'])
+@admin_requerido
+def listar_pagos(uid):
+    user = Usuario.query.get_or_404(uid)
+    return jsonify([{
+        'id':     p.id,
+        'monto':  p.monto,
+        'metodo': p.metodo,
+        'notas':  p.notas,
+        'fecha':  p.fecha.isoformat()
+    } for p in sorted(user.pagos, key=lambda x: x.fecha, reverse=True)])
+
+@app.route('/admin/usuarios/<int:uid>/pagos', methods=['POST'])
+@admin_requerido
+def registrar_pago(uid):
+    user = Usuario.query.get_or_404(uid)
+    data = request.json
+    pago = Pago(
+        usuario_id = uid,
+        monto      = float(data.get('monto', 0)),
+        metodo     = data.get('metodo', 'Efectivo'),
+        notas      = data.get('notas', '')
+    )
+    db.session.add(pago)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': pago.id})
+
+@app.route('/admin/pagos/<int:pid>', methods=['DELETE'])
+@admin_requerido
+def eliminar_pago(pid):
+    pago = Pago.query.get_or_404(pid)
+    db.session.delete(pago)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/admin/resumen-pagos')
+@admin_requerido
+def resumen_pagos():
+    from sqlalchemy import func
+    pagos = Pago.query.all()
+    total = sum(p.monto for p in pagos)
+    este_mes = sum(p.monto for p in pagos if p.fecha.month == datetime.utcnow().month and p.fecha.year == datetime.utcnow().year)
+    # Pagos por mes (últimos 6 meses)
+    from collections import defaultdict
+    por_mes = defaultdict(float)
+    for p in pagos:
+        key = p.fecha.strftime('%Y-%m')
+        por_mes[key] += p.monto
+    return jsonify({
+        'total': total,
+        'este_mes': este_mes,
+        'por_mes': dict(sorted(por_mes.items())[-6:])
+    })
+
+# ════════════════════════════════════════════════════════════════
 #  ESTADÍSTICAS
 # ════════════════════════════════════════════════════════════════
 
@@ -453,7 +511,8 @@ def stats():
         'total_usuarios':     Usuario.query.count(),
         'usuarios_activos':   Usuario.query.filter_by(activo=True).count(),
         'usuarios_expirados': Usuario.query.filter(Usuario.fecha_expira < datetime.utcnow()).count(),
-        'online_ahora':       SesionActiva.query.distinct(SesionActiva.usuario_id).count()
+        'online_ahora':       SesionActiva.query.distinct(SesionActiva.usuario_id).count(),
+        'ingresos_mes':       sum(p.monto for p in Pago.query.all() if p.fecha.month == datetime.utcnow().month and p.fecha.year == datetime.utcnow().year)
     })
 
 # ════════════════════════════════════════════════════════════════
