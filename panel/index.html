@@ -105,6 +105,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <button class="nav-item" onclick="showPage('nuevo',this)"><span>➕</span>Nuevo usuario</button>
     <button class="nav-item" onclick="showPage('clientes',this)"><span>👤</span>Clientes CRM</button>
     <button class="nav-item" onclick="showPage('logs',this)"><span>📋</span>Logs de acceso</button>
+    <button class="nav-item" onclick="showPage('whatsapp',this)"><span>💬</span>WhatsApp</button>
   </nav>
   <div class="sidebar-footer">
     <button class="btn-logout" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
@@ -182,6 +183,53 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;min-width:130px;text-align:right">Fecha</span>
       </div>
       <div id="lista-logs"><div style="padding:32px;text-align:center;color:var(--muted)">Cargando...</div></div>
+    </div>
+  </div>
+
+  <!-- WHATSAPP -->
+  <div class="page" id="page-whatsapp">
+    <div class="page-title">💬 WhatsApp</div>
+
+    <div class="card">
+      <div class="card-title">Estado de conexión</div>
+      <div id="wa-status-box" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div id="wa-badge" class="badge badge-red">⚫ Desconectado</div>
+        <a href="/wa/qr" target="_blank" class="btn btn-ghost btn-sm">📱 Ver QR / Conectar</a>
+        <button class="btn btn-ghost btn-sm" onclick="checkWaStatus()">🔄 Actualizar estado</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Notificaciones automáticas</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
+        Envía avisos a clientes cuya suscripción está por vencer. Solo se envía a clientes que tienen WhatsApp registrado.
+      </p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div class="field">
+          <label>Avisar con X días de anticipación</label>
+          <select id="wa-dias-aviso" style="width:180px">
+            <option value="1">1 día antes</option>
+            <option value="2">2 días antes</option>
+            <option value="3" selected>3 días antes</option>
+            <option value="5">5 días antes</option>
+            <option value="7">7 días antes</option>
+          </select>
+        </div>
+        <div class="field" style="align-self:end">
+          <button class="btn btn-wa" onclick="notificarVencimiento()">📤 Enviar avisos ahora</button>
+        </div>
+      </div>
+      <div id="wa-notify-result" style="margin-top:14px"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title">Enviar mensaje manual</div>
+      <div class="form-grid">
+        <div class="field"><label>Número WhatsApp</label><input id="wa-phone" placeholder="+57 300 123 4567"></div>
+        <div class="field"><label>Mensaje</label><input id="wa-msg" placeholder="Escribe el mensaje..."></div>
+        <div class="field" style="align-self:end"><button class="btn btn-wa" style="width:100%" onclick="enviarMensajeManual()">💬 Enviar</button></div>
+      </div>
+      <div id="wa-send-result" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -374,7 +422,66 @@ async function suspender(uid){await fetch(API+`/admin/usuarios/${uid}/suspender`
 async function eliminar(uid,nombre){if(!confirm(`¿Eliminar "${nombre}"?`))return;await fetch(API+`/admin/usuarios/${uid}`,{method:'DELETE'});cargarUsuarios();}
 async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${nombre}"?`))return;const r=await fetch(API+`/admin/usuarios/${uid}/reset-password`,{method:'POST'});const d=await r.json();if(!r.ok){alert('Error');return;}lastCreds={...d,paquete:''};mostrarCreds(d,'🔑 Contraseña reseteada');}
 
-cargarStats();
+  async function checkWaStatus() {
+    try {
+      const r = await fetch(API + '/admin/wa/status');
+      const d = await r.json();
+      const badge = document.getElementById('wa-badge');
+      if (d.ready) {
+        badge.className = 'badge badge-green';
+        badge.textContent = '🟢 Conectado';
+      } else if (d.hasQr) {
+        badge.className = 'badge badge-yellow';
+        badge.textContent = '🟡 Esperando QR';
+      } else {
+        badge.className = 'badge badge-red';
+        badge.textContent = '⚫ Desconectado';
+      }
+    } catch(e) {
+      document.getElementById('wa-badge').textContent = '❌ Error de conexión';
+    }
+  }
+
+  async function notificarVencimiento() {
+    const dias = document.getElementById('wa-dias-aviso').value;
+    const res = document.getElementById('wa-notify-result');
+    res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
+    try {
+      const r = await fetch(API + '/admin/wa/notify-expiring', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({dias})
+      });
+      const d = await r.json();
+      if (d.ok) {
+        res.innerHTML = `<span style="color:var(--green)">✅ Enviados: ${d.enviados} de ${d.total} clientes con WhatsApp</span>`;
+      } else {
+        res.innerHTML = `<span style="color:var(--red)">❌ ${d.error || 'Error al enviar'}</span>`;
+      }
+    } catch(e) { res.innerHTML = '<span style="color:var(--red)">❌ Error de conexión</span>'; }
+  }
+
+  async function enviarMensajeManual() {
+    const phone = document.getElementById('wa-phone').value.trim();
+    const message = document.getElementById('wa-msg').value.trim();
+    const res = document.getElementById('wa-send-result');
+    if (!phone || !message) { alert('Completa el número y el mensaje'); return; }
+    res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
+    try {
+      const r = await fetch(API + '/admin/wa/send', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({phone, message})
+      });
+      const d = await r.json();
+      if (d.ok) {
+        res.innerHTML = '<span style="color:var(--green)">✅ Mensaje enviado</span>';
+        document.getElementById('wa-msg').value = '';
+      } else {
+        res.innerHTML = `<span style="color:var(--red)">❌ ${d.error || 'No se pudo enviar. ¿WhatsApp conectado?'}</span>`;
+      }
+    } catch(e) { res.innerHTML = '<span style="color:var(--red)">❌ Error</span>'; }
+  }
+
+  cargarStats();
 </script>
 </body>
 </html>

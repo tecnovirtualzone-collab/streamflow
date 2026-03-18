@@ -15,8 +15,69 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db.init_app(app)
 
 URL_M3U_PROVEEDOR = os.environ.get('URL_M3U', '')
+WA_SERVICE_URL = os.environ.get('WA_SERVICE_URL', 'http://localhost:3001')
 ADMIN_USER = os.environ.get('ADMIN_USER', 'admin')
 ADMIN_PASS = os.environ.get('ADMIN_PASSWORD', 'admin123')
+
+# ════════════════════════════════════════════════════════════════
+#  WHATSAPP
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/admin/wa/status')
+@admin_requerido
+def wa_status():
+    try:
+        resp = requests.get(f"{WA_SERVICE_URL}/status", timeout=5)
+        return jsonify(resp.json())
+    except Exception:
+        return jsonify({'ready': False, 'hasQr': False, 'error': 'Servicio WA no disponible'})
+
+@app.route('/admin/wa/send', methods=['POST'])
+@admin_requerido
+def wa_send():
+    data = request.json
+    try:
+        resp = requests.post(f"{WA_SERVICE_URL}/send", json=data, timeout=10)
+        return jsonify(resp.json())
+    except Exception:
+        return jsonify({'ok': False, 'error': 'Error al enviar'})
+
+@app.route('/admin/wa/notify-expiring', methods=['POST'])
+@admin_requerido
+def wa_notify_expiring():
+    dias = int(request.json.get('dias', 3))
+    try:
+        users = Usuario.query.filter(
+            Usuario.activo == True,
+            Usuario.notas != '',
+            Usuario.notas != None,
+            Usuario.fecha_expira > datetime.utcnow(),
+            Usuario.fecha_expira <= datetime.utcnow() + timedelta(days=dias)
+        ).all()
+        enviados = 0
+        for u in users:
+            dias_rest = (u.fecha_expira - datetime.utcnow()).days + 1
+            mensaje = (
+                f"⚠️ *¡Tu suscripción StreamFlow vence pronto!*
+
+"
+                f"Hola *{u.usuario}*, tu acceso vence en *{dias_rest} día{'s' if dias_rest != 1 else ''}*.
+
+"
+                f"Para renovar, contáctanos 👇
+"
+                f"_Soporte vía WhatsApp_ 💬"
+            )
+            try:
+                resp = requests.post(f"{WA_SERVICE_URL}/send",
+                    json={'phone': u.notas, 'message': mensaje}, timeout=10)
+                if resp.json().get('ok'):
+                    enviados += 1
+            except Exception:
+                pass
+        return jsonify({'ok': True, 'enviados': enviados, 'total': len(users)})
+    except Exception as e:
+        return jsonify({'ok': False, 'error': str(e)})
 
 # ════════════════════════════════════════════════════════════════
 #  AUTENTICACION PANEL ADMIN
@@ -559,6 +620,11 @@ def stats():
 # ════════════════════════════════════════════════════════════════
 #  PANEL ADMIN — FRONTEND
 # ════════════════════════════════════════════════════════════════
+
+@app.route('/wa/qr')
+def wa_qr():
+    from flask import redirect as redir
+    return redir(f"{WA_SERVICE_URL}/qr")
 
 @app.route('/panel/')
 @app.route('/panel')
