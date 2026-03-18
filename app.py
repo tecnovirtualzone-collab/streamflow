@@ -58,15 +58,10 @@ def wa_notify_expiring():
         for u in users:
             dias_rest = (u.fecha_expira - datetime.utcnow()).days + 1
             mensaje = (
-                f"⚠️ *¡Tu suscripción StreamFlow vence pronto!*
-
-"
-                f"Hola *{u.usuario}*, tu acceso vence en *{dias_rest} día{'s' if dias_rest != 1 else ''}*.
-
-"
-                f"Para renovar, contáctanos 👇
-"
-                f"_Soporte vía WhatsApp_ 💬"
+                "\u26a0\ufe0f *\u00a1Tu suscripci\u00f3n StreamFlow vence pronto!*\n\n"
+                + f"Hola *{u.usuario}*, tu acceso vence en *{dias_rest} d\u00eda" + ("s" if dias_rest != 1 else "") + "*.\n\n"
+                + "Para renovar, cont\u00e1ctanos \U0001f447\n"
+                + "_Soporte v\u00eda WhatsApp_ \U0001f4ac"
             )
             try:
                 resp = requests.post(f"{WA_SERVICE_URL}/send",
