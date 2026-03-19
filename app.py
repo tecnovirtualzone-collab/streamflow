@@ -3,7 +3,9 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
-import requests, secrets, os, threading, subprocess, time, tempfile, shutil, logging
+import requests, secrets, os, threading, time, tempfile, shutil, logging
+from gevent import subprocess
+from gevent import monkey
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [HLS] %(message)s')
 hls_log = logging.getLogger('hls')
 from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
@@ -89,7 +91,8 @@ os.makedirs(HLS_DIR, exist_ok=True)
 
 # { canal_id: { 'proc': subprocess, 'viewers': int, 'last_view': timestamp, 'ready': bool } }
 _relays = {}
-_relay_lock = threading.Lock()
+from gevent.lock import RLock as _RLock
+_relay_lock = _RLock()
 
 def get_hls_dir(canal_id):
     d = os.path.join(HLS_DIR, str(canal_id))
@@ -121,8 +124,8 @@ def start_relay(canal_id, url_proveedor):
             '-i', url_proveedor,
             '-c', 'copy',
             '-f', 'hls',
-            '-hls_time', '3',
-            '-hls_list_size', '10',
+            '-hls_time', '2',
+            '-hls_list_size', '20',
             '-hls_flags', 'append_list',
             '-hls_segment_filename', os.path.join(hls_path, 'seg%05d.ts'),
             playlist
@@ -144,7 +147,7 @@ def start_relay(canal_id, url_proveedor):
                 'playlist':  playlist
             }
             # Esperar hasta que el playlist esté listo (máx 8 segundos)
-            threading.Thread(target=_mark_ready, args=(canal_id,), daemon=True).start()
+            import gevent; gevent.spawn(_mark_ready, canal_id)
             return True
         except Exception as e:
             print(f"Error arrancando FFmpeg para canal {canal_id}: {e}")
@@ -184,8 +187,10 @@ def cleanup_relays():
                 del _relays[cid]
                 print(f"Relay canal {cid} apagado")
 
-# Iniciar hilo de limpieza
-threading.Thread(target=cleanup_relays, daemon=True).start()
+# Iniciar hilo de limpieza (se inicia desde app context)
+def init_relay_cleanup():
+    import gevent
+    gevent.spawn(cleanup_relays)
 
 PAQUETES = {
     'basico':   {'max_conexiones': 1},
@@ -890,6 +895,7 @@ def panel():
 
 with app.app_context():
     db.create_all()
+    init_relay_cleanup()
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
