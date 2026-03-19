@@ -1,9 +1,10 @@
 FROM python:3.11-slim
 
-# Instalar Node.js y Chromium
+# Instalar Node.js, Chromium y FFmpeg
 RUN apt-get update && apt-get install -y \
     curl gnupg \
     chromium \
+    ffmpeg \
     libgbm-dev libasound2 libatk1.0-0 libcairo2 \
     libcups2 libdbus-1-3 libglib2.0-0 libgtk-3-0 \
     libnspr4 libnss3 libpango-1.0-0 libx11-6 \
@@ -19,20 +20,18 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 
 WORKDIR /app
 
-# Instalar dependencias Python
+# Python deps
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-# Instalar dependencias Node
+# Node deps
 COPY wa-service/package*.json ./wa-service/
 RUN cd wa-service && npm install --production
 
-# Copiar código
 COPY . .
 
 EXPOSE 5000 3001
 
-# Script de inicio
 COPY start.sh .
 RUN chmod +x start.sh
 CMD ["./start.sh"]

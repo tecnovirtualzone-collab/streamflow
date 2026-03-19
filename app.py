@@ -3,7 +3,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
-import requests, secrets, os
+import requests, secrets, os, threading, subprocess, time, tempfile, shutil
 from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
 
 app = Flask(__name__)
@@ -75,6 +75,111 @@ def get_proveedor_info():
         return base, user, pwd
     except Exception:
         return '', '', ''
+
+# ════════════════════════════════════════════════════════════════
+#  HLS RELAY — Un proceso FFmpeg por canal, compartido entre clientes
+# ════════════════════════════════════════════════════════════════
+
+HLS_DIR     = '/tmp/hls'
+HLS_TIMEOUT = 45  # segundos sin viewers para apagar el relay
+
+os.makedirs(HLS_DIR, exist_ok=True)
+
+# { canal_id: { 'proc': subprocess, 'viewers': int, 'last_view': timestamp, 'ready': bool } }
+_relays = {}
+_relay_lock = threading.Lock()
+
+def get_hls_dir(canal_id):
+    d = os.path.join(HLS_DIR, str(canal_id))
+    os.makedirs(d, exist_ok=True)
+    return d
+
+def start_relay(canal_id, url_proveedor):
+    """Arranca FFmpeg para un canal si no está corriendo"""
+    with _relay_lock:
+        if canal_id in _relays and _relays[canal_id]['proc'].poll() is None:
+            _relays[canal_id]['viewers'] += 1
+            _relays[canal_id]['last_view'] = time.time()
+            return True
+
+        hls_path = get_hls_dir(canal_id)
+        playlist = os.path.join(hls_path, 'index.m3u8')
+
+        # Limpiar segmentos anteriores
+        for f in os.listdir(hls_path):
+            try: os.remove(os.path.join(hls_path, f))
+            except: pass
+
+        cmd = [
+            'ffmpeg', '-y',
+            '-reconnect', '1',
+            '-reconnect_streamed', '1',
+            '-reconnect_delay_max', '5',
+            '-i', url_proveedor,
+            '-c', 'copy',
+            '-f', 'hls',
+            '-hls_time', '2',
+            '-hls_list_size', '5',
+            '-hls_flags', 'delete_segments+append_list',
+            '-hls_segment_filename', os.path.join(hls_path, 'seg%d.ts'),
+            playlist
+        ]
+
+        try:
+            proc = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL
+            )
+            _relays[canal_id] = {
+                'proc':      proc,
+                'viewers':   1,
+                'last_view': time.time(),
+                'ready':     False,
+                'path':      hls_path,
+                'playlist':  playlist
+            }
+            # Esperar hasta que el playlist esté listo (máx 8 segundos)
+            threading.Thread(target=_mark_ready, args=(canal_id,), daemon=True).start()
+            return True
+        except Exception as e:
+            print(f"Error arrancando FFmpeg para canal {canal_id}: {e}")
+            return False
+
+def _mark_ready(canal_id):
+    playlist = _relays[canal_id]['playlist']
+    for _ in range(40):  # 8 segundos max
+        if os.path.exists(playlist) and os.path.getsize(playlist) > 0:
+            with _relay_lock:
+                if canal_id in _relays:
+                    _relays[canal_id]['ready'] = True
+            return
+        time.sleep(0.2)
+
+def stop_relay(canal_id):
+    with _relay_lock:
+        if canal_id in _relays:
+            _relays[canal_id]['viewers'] = max(0, _relays[canal_id]['viewers'] - 1)
+
+def cleanup_relays():
+    """Hilo que apaga relays sin viewers"""
+    while True:
+        time.sleep(10)
+        with _relay_lock:
+            to_remove = []
+            for cid, info in _relays.items():
+                if info['viewers'] <= 0 and time.time() - info['last_view'] > HLS_TIMEOUT:
+                    try:
+                        info['proc'].terminate()
+                        shutil.rmtree(info['path'], ignore_errors=True)
+                    except: pass
+                    to_remove.append(cid)
+            for cid in to_remove:
+                del _relays[cid]
+                print(f"Relay canal {cid} apagado")
+
+# Iniciar hilo de limpieza
+threading.Thread(target=cleanup_relays, daemon=True).start()
 
 PAQUETES = {
     'basico':   {'max_conexiones': 1},
@@ -233,18 +338,112 @@ def get_php():
 # ════════════════════════════════════════════════════════════════
 
 @app.route('/live/<usuario>/<contrasena>/<canal>')
-@app.route('/movie/<usuario>/<contrasena>/<canal>')
-@app.route('/series/<usuario>/<contrasena>/<canal>')
-def stream_xtream(usuario, contrasena, canal):
-    mac  = request.headers.get('X-MAC-Address', '')
-    ip   = request.headers.get('X-Real-IP', request.remote_addr)
-    ruta = request.path.split('/')[1]  # live, movie o series
+def live_stream_hls(usuario, contrasena, canal):
+    """Canal live — usa relay HLS compartido"""
+    mac = request.headers.get('X-MAC-Address', '')
+    ip  = request.headers.get('X-Real-IP', request.remote_addr)
 
     ok, user_obj, resultado = verificar_acceso(usuario, contrasena, mac, ip, canal)
     if not ok:
         return jsonify({'error': resultado}), 403
 
-    # Registrar log de acceso
+    if user_obj:
+        try:
+            log = LogAcceso(usuario_id=user_obj.id, canal=canal, ip=ip)
+            db.session.add(log)
+            db.session.commit()
+        except Exception:
+            pass
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    # Extraer solo el id del canal (sin extensión)
+    canal_id = canal.replace('.ts', '').replace('.m3u8', '')
+    url_proveedor = f"{base_prov}/live/{prov_user}/{prov_pass}/{canal_id}.ts"
+
+    # Arrancar relay si no existe
+    start_relay(canal_id, url_proveedor)
+
+    # Esperar hasta 8s a que el relay esté listo
+    for _ in range(40):
+        info = _relays.get(canal_id)
+        if info and info.get('ready'):
+            break
+        time.sleep(0.2)
+
+    info = _relays.get(canal_id)
+    if not info or not info.get('ready'):
+        # Fallback: proxy directo si FFmpeg no arrancó
+        stop_relay(canal_id)
+        try:
+            resp = requests.get(url_proveedor, stream=True, timeout=15,
+                                headers={'User-Agent': 'Mozilla/5.0'})
+            def gen_fallback():
+                try:
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        if chunk: yield chunk
+                except: pass
+            return Response(gen_fallback(),
+                            content_type=resp.headers.get('Content-Type', 'video/mp2t'),
+                            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+        except Exception:
+            return jsonify({'error': 'Error al conectar'}), 502
+
+    # Servir la playlist HLS
+    playlist_path = info['playlist']
+    try:
+        with open(playlist_path, 'r') as f:
+            playlist_content = f.read()
+
+        host = get_host()
+        # Reescribir URLs de segmentos para que apunten a nuestro servidor
+        lines = []
+        for line in playlist_content.splitlines():
+            if line.startswith('seg') and line.endswith('.ts'):
+                lines.append(f"{host}/hls/{canal_id}/{line}")
+            else:
+                lines.append(line)
+
+        def on_close():
+            stop_relay(canal_id)
+
+        resp = Response(
+            '\n'.join(lines),
+            content_type='application/vnd.apple.mpegurl',
+            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+        )
+        resp.call_on_close(on_close)
+        return resp
+    except Exception:
+        stop_relay(canal_id)
+        return jsonify({'error': 'Relay no disponible'}), 502
+
+@app.route('/hls/<canal_id>/<segmento>')
+def serve_hls_segment(canal_id, segmento):
+    """Sirve segmentos HLS del relay"""
+    seg_path = os.path.join(HLS_DIR, canal_id, segmento)
+    if not os.path.exists(seg_path):
+        return '', 404
+    with open(seg_path, 'rb') as f:
+        data = f.read()
+    # Actualizar last_view
+    with _relay_lock:
+        if canal_id in _relays:
+            _relays[canal_id]['last_view'] = time.time()
+    return Response(data, content_type='video/mp2t',
+                    headers={'Cache-Control': 'no-cache'})
+
+@app.route('/movie/<usuario>/<contrasena>/<canal>')
+@app.route('/series/<usuario>/<contrasena>/<canal>')
+def stream_xtream(usuario, contrasena, canal):
+    """Películas y series — proxy directo (cada cliente en su propio minuto)"""
+    mac  = request.headers.get('X-MAC-Address', '')
+    ip   = request.headers.get('X-Real-IP', request.remote_addr)
+    ruta = request.path.split('/')[1]
+
+    ok, user_obj, resultado = verificar_acceso(usuario, contrasena, mac, ip, canal)
+    if not ok:
+        return jsonify({'error': resultado}), 403
+
     if user_obj:
         try:
             log = LogAcceso(usuario_id=user_obj.id, canal=canal, ip=ip)
@@ -257,29 +456,18 @@ def stream_xtream(usuario, contrasena, canal):
     url_real = f"{base_prov}/{ruta}/{prov_user}/{prov_pass}/{canal}"
 
     try:
-        resp = requests.get(
-            url_real, stream=True, timeout=30,
-            headers={'User-Agent': 'Mozilla/5.0 (SMART-TV)'}
-        )
-
+        resp = requests.get(url_real, stream=True, timeout=30,
+                            headers={'User-Agent': 'Mozilla/5.0'})
         def generate():
             try:
                 for chunk in resp.iter_content(chunk_size=65536):
-                    if chunk:
-                        yield chunk
-            except Exception:
-                pass
-
-        return Response(
-            generate(),
-            content_type=resp.headers.get('Content-Type', 'video/mp2t'),
-            headers={
-                'Cache-Control':    'no-cache',
-                'X-Accel-Buffering':'no',
-            }
-        )
+                    if chunk: yield chunk
+            except: pass
+        return Response(generate(),
+                        content_type=resp.headers.get('Content-Type', 'video/mp2t'),
+                        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
     except Exception:
-        return jsonify({'error': 'Error al conectar con el proveedor'}), 502
+        return jsonify({'error': 'Error al conectar'}), 502
 
 @app.route('/stream')
 def stream_legacy():
