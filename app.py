@@ -389,10 +389,36 @@ def live_stream_hls(usuario, contrasena, canal):
         except Exception:
             return jsonify({'error': 'Error al conectar'}), 502
 
-    # Redirigir al endpoint del playlist HLS
-    from flask import redirect as redir
-    host = get_host()
-    return redir(f"{host}/hls/{canal_id}/index.m3u8", code=302)
+    # Servir playlist directamente
+    playlist_path = info['playlist']
+    try:
+        with open(playlist_path, 'r') as f:
+            playlist_content = f.read()
+
+        host = get_host()
+        lines = []
+        for line in playlist_content.splitlines():
+            if line.endswith('.ts') and not line.startswith('#'):
+                lines.append(f"{host}/hls/{canal_id}/{line.strip()}")
+            else:
+                lines.append(line)
+
+        with _relay_lock:
+            if canal_id in _relays:
+                _relays[canal_id]['last_view'] = time.time()
+                _relays[canal_id]['viewers'] = max(1, _relays[canal_id].get('viewers', 1))
+
+        return Response(
+            '\n'.join(lines),
+            content_type='application/vnd.apple.mpegurl',
+            headers={
+                'Cache-Control': 'no-cache, no-store',
+                'X-Accel-Buffering': 'no'
+            }
+        )
+    except Exception:
+        stop_relay(canal_id)
+        return jsonify({'error': 'Relay no disponible'}), 502
 
 @app.route('/hls/<canal_id>/<segmento>')
 def serve_hls_segment(canal_id, segmento):
