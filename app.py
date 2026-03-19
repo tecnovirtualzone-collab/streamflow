@@ -3,7 +3,9 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
-import requests, secrets, os, threading, subprocess, time, tempfile, shutil
+import requests, secrets, os, threading, subprocess, time, tempfile, shutil, logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s [HLS] %(message)s')
+hls_log = logging.getLogger('hls')
 from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
 
 app = Flask(__name__)
@@ -127,10 +129,11 @@ def start_relay(canal_id, url_proveedor):
         ]
 
         try:
+            hls_log.info(f'Arrancando FFmpeg para canal {canal_id}: {url_proveedor}')
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL
+                stderr=subprocess.PIPE
             )
             _relays[canal_id] = {
                 'proc':      proc,
@@ -149,13 +152,15 @@ def start_relay(canal_id, url_proveedor):
 
 def _mark_ready(canal_id):
     playlist = _relays[canal_id]['playlist']
-    for _ in range(40):  # 8 segundos max
+    for i in range(40):  # 8 segundos max
         if os.path.exists(playlist) and os.path.getsize(playlist) > 0:
             with _relay_lock:
                 if canal_id in _relays:
                     _relays[canal_id]['ready'] = True
+            hls_log.info(f'Canal {canal_id} listo en {i*0.2:.1f}s')
             return
         time.sleep(0.2)
+    hls_log.error(f'Canal {canal_id} NO se puso listo en 8s')
 
 def stop_relay(canal_id):
     with _relay_lock:
@@ -340,7 +345,7 @@ def get_php():
 
 @app.route('/live/<usuario>/<contrasena>/<canal>')
 def live_stream_hls(usuario, contrasena, canal):
-    """Canal live — usa relay HLS compartido"""
+    """Canal live — relay HLS, stream TS continuo hacia el cliente"""
     mac = request.headers.get('X-MAC-Address', '')
     ip  = request.headers.get('X-Real-IP', request.remote_addr)
 
@@ -357,7 +362,6 @@ def live_stream_hls(usuario, contrasena, canal):
             pass
 
     base_prov, prov_user, prov_pass = get_proveedor_info()
-    # Extraer solo el id del canal (sin extensión)
     canal_id = canal.replace('.ts', '').replace('.m3u8', '')
     url_proveedor = f"{base_prov}/live/{prov_user}/{prov_pass}/{canal_id}.ts"
 
@@ -373,7 +377,7 @@ def live_stream_hls(usuario, contrasena, canal):
 
     info = _relays.get(canal_id)
     if not info or not info.get('ready'):
-        # Fallback: proxy directo si FFmpeg no arrancó
+        # Fallback: proxy directo
         stop_relay(canal_id)
         try:
             resp = requests.get(url_proveedor, stream=True, timeout=15,
@@ -384,41 +388,59 @@ def live_stream_hls(usuario, contrasena, canal):
                         if chunk: yield chunk
                 except: pass
             return Response(gen_fallback(),
-                            content_type=resp.headers.get('Content-Type', 'video/mp2t'),
+                            content_type='video/mp2t',
                             headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
         except Exception:
             return jsonify({'error': 'Error al conectar'}), 502
 
-    # Servir playlist directamente
-    playlist_path = info['playlist']
-    try:
-        with open(playlist_path, 'r') as f:
-            playlist_content = f.read()
+    # Stream continuo: leer segmentos HLS y enviarlos al cliente como TS
+    def generate_ts():
+        seg_index = 0
+        consecutive_errors = 0
+        while consecutive_errors < 10:
+            with _relay_lock:
+                if canal_id in _relays:
+                    _relays[canal_id]['last_view'] = time.time()
+                    _relays[canal_id]['viewers'] = max(1, _relays[canal_id].get('viewers', 1))
+                else:
+                    break
 
-        host = get_host()
-        lines = []
-        for line in playlist_content.splitlines():
-            if line.endswith('.ts') and not line.startswith('#'):
-                lines.append(f"{host}/hls/{canal_id}/{line.strip()}")
-            else:
-                lines.append(line)
+            seg_path = os.path.join(HLS_DIR, canal_id, f'seg{seg_index:05d}.ts')
 
-        with _relay_lock:
-            if canal_id in _relays:
-                _relays[canal_id]['last_view'] = time.time()
-                _relays[canal_id]['viewers'] = max(1, _relays[canal_id].get('viewers', 1))
+            # Esperar hasta 4 segundos por el segmento
+            found = False
+            for _ in range(20):
+                if os.path.exists(seg_path) and os.path.getsize(seg_path) > 10000:
+                    found = True
+                    break
+                time.sleep(0.2)
 
-        return Response(
-            '\n'.join(lines),
-            content_type='application/vnd.apple.mpegurl',
-            headers={
-                'Cache-Control': 'no-cache, no-store',
-                'X-Accel-Buffering': 'no'
-            }
-        )
-    except Exception:
+            if not found:
+                consecutive_errors += 1
+                time.sleep(0.5)
+                continue
+
+            consecutive_errors = 0
+            try:
+                with open(seg_path, 'rb') as f:
+                    while True:
+                        chunk = f.read(65536)
+                        if not chunk:
+                            break
+                        yield chunk
+            except Exception:
+                break
+
+            seg_index += 1
+
         stop_relay(canal_id)
-        return jsonify({'error': 'Relay no disponible'}), 502
+
+    return Response(
+        generate_ts(),
+        content_type='video/mp2t',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
 
 @app.route('/hls/<canal_id>/<segmento>')
 def serve_hls_segment(canal_id, segmento):
@@ -432,10 +454,12 @@ def serve_hls_segment(canal_id, segmento):
         time.sleep(0.2)
 
     if not os.path.exists(seg_path):
+        hls_log.warning(f'Segmento no encontrado: {canal_id}/{segmento}')
         return '', 404
 
     with open(seg_path, 'rb') as f:
         data = f.read()
+    hls_log.info(f'Segmento servido: {canal_id}/{segmento} ({len(data)} bytes)')
 
     # Actualizar last_view para mantener relay activo
     with _relay_lock:
