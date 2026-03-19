@@ -654,18 +654,18 @@ def listar_usuarios():
 @app.route('/admin/usuarios', methods=['POST'])
 @admin_requerido
 def crear_usuario():
-    data    = request.json
-    paquete = data.get('paquete', 'basico')
-    dias    = int(data.get('dias', 30))
-    config  = PAQUETES.get(paquete, PAQUETES['basico'])
-    pwd     = secrets.token_urlsafe(8)
+    data      = request.json
+    paquete   = data.get('paquete', 'basico')
+    pantallas = int(data.get('pantallas', 1))
+    dias      = int(data.get('dias', 30))
+    pwd       = secrets.token_urlsafe(8)
     if Usuario.query.filter_by(usuario=data['usuario']).first():
         return jsonify({'error': 'El usuario ya existe'}), 400
     user = Usuario(
         usuario        = data['usuario'],
         contrasena     = generate_password_hash(pwd),
         paquete        = paquete,
-        max_conexiones = config['max_conexiones'],
+        max_conexiones = pantallas,
         fecha_expira   = datetime.utcnow() + timedelta(days=dias),
         notas          = data.get('notas', '')
     )
