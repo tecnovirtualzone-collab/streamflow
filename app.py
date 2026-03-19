@@ -3,9 +3,7 @@ from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
-import requests, secrets, os, threading, time, tempfile, shutil, logging
-from gevent import subprocess
-from gevent import monkey
+import requests, secrets, os, threading, time, tempfile, shutil, logging, subprocess
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [HLS] %(message)s')
 hls_log = logging.getLogger('hls')
 from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
@@ -91,8 +89,7 @@ os.makedirs(HLS_DIR, exist_ok=True)
 
 # { canal_id: { 'proc': subprocess, 'viewers': int, 'last_view': timestamp, 'ready': bool } }
 _relays = {}
-from gevent.lock import RLock as _RLock
-_relay_lock = _RLock()
+_relay_lock = threading.Lock()
 
 def get_hls_dir(canal_id):
     d = os.path.join(HLS_DIR, str(canal_id))
@@ -136,7 +133,9 @@ def start_relay(canal_id, url_proveedor):
             proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.PIPE
+                stderr=subprocess.DEVNULL,
+                preexec_fn=os.setsid,
+                close_fds=True
             )
             _relays[canal_id] = {
                 'proc':      proc,
@@ -147,7 +146,8 @@ def start_relay(canal_id, url_proveedor):
                 'playlist':  playlist
             }
             # Esperar hasta que el playlist esté listo (máx 8 segundos)
-            import gevent; gevent.spawn(_mark_ready, canal_id)
+            t = threading.Thread(target=_mark_ready, args=(canal_id,), daemon=True)
+            t.start()
             return True
         except Exception as e:
             print(f"Error arrancando FFmpeg para canal {canal_id}: {e}")
