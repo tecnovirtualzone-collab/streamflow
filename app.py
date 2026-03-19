@@ -81,7 +81,7 @@ def get_proveedor_info():
 # ════════════════════════════════════════════════════════════════
 
 HLS_DIR     = '/tmp/hls'
-HLS_TIMEOUT = 45  # segundos sin viewers para apagar el relay
+HLS_TIMEOUT = 60  # segundos sin viewers para apagar el relay
 
 os.makedirs(HLS_DIR, exist_ok=True)
 
@@ -115,13 +115,14 @@ def start_relay(canal_id, url_proveedor):
             '-reconnect', '1',
             '-reconnect_streamed', '1',
             '-reconnect_delay_max', '5',
+            '-user_agent', 'Mozilla/5.0',
             '-i', url_proveedor,
             '-c', 'copy',
             '-f', 'hls',
-            '-hls_time', '2',
-            '-hls_list_size', '5',
-            '-hls_flags', 'delete_segments+append_list',
-            '-hls_segment_filename', os.path.join(hls_path, 'seg%d.ts'),
+            '-hls_time', '3',
+            '-hls_list_size', '10',
+            '-hls_flags', 'append_list',
+            '-hls_segment_filename', os.path.join(hls_path, 'seg%05d.ts'),
             playlist
         ]
 
@@ -388,48 +389,65 @@ def live_stream_hls(usuario, contrasena, canal):
         except Exception:
             return jsonify({'error': 'Error al conectar'}), 502
 
-    # Servir la playlist HLS
-    playlist_path = info['playlist']
-    try:
-        with open(playlist_path, 'r') as f:
-            playlist_content = f.read()
-
-        host = get_host()
-        # Reescribir URLs de segmentos para que apunten a nuestro servidor
-        lines = []
-        for line in playlist_content.splitlines():
-            if line.startswith('seg') and line.endswith('.ts'):
-                lines.append(f"{host}/hls/{canal_id}/{line}")
-            else:
-                lines.append(line)
-
-        def on_close():
-            stop_relay(canal_id)
-
-        resp = Response(
-            '\n'.join(lines),
-            content_type='application/vnd.apple.mpegurl',
-            headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
-        )
-        resp.call_on_close(on_close)
-        return resp
-    except Exception:
-        stop_relay(canal_id)
-        return jsonify({'error': 'Relay no disponible'}), 502
+    # Redirigir al endpoint del playlist HLS
+    from flask import redirect as redir
+    host = get_host()
+    return redir(f"{host}/hls/{canal_id}/index.m3u8", code=302)
 
 @app.route('/hls/<canal_id>/<segmento>')
 def serve_hls_segment(canal_id, segmento):
     """Sirve segmentos HLS del relay"""
     seg_path = os.path.join(HLS_DIR, canal_id, segmento)
+
+    # Esperar hasta 3 segundos si el segmento aún no existe
+    for _ in range(15):
+        if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
+            break
+        time.sleep(0.2)
+
     if not os.path.exists(seg_path):
         return '', 404
+
     with open(seg_path, 'rb') as f:
         data = f.read()
-    # Actualizar last_view
+
+    # Actualizar last_view para mantener relay activo
     with _relay_lock:
         if canal_id in _relays:
             _relays[canal_id]['last_view'] = time.time()
+            _relays[canal_id]['viewers'] = max(1, _relays[canal_id].get('viewers', 1))
+
     return Response(data, content_type='video/mp2t',
+                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+@app.route('/hls/<canal_id>/index.m3u8')
+def serve_hls_playlist(canal_id):
+    """Sirve el playlist HLS actualizado"""
+    info = _relays.get(canal_id)
+    if not info:
+        return '', 404
+
+    playlist_path = info['playlist']
+    if not os.path.exists(playlist_path):
+        return '', 404
+
+    with _relay_lock:
+        if canal_id in _relays:
+            _relays[canal_id]['last_view'] = time.time()
+
+    with open(playlist_path, 'r') as f:
+        playlist_content = f.read()
+
+    host = get_host()
+    lines = []
+    for line in playlist_content.splitlines():
+        if line.endswith('.ts') and not line.startswith('#'):
+            lines.append(f"{host}/hls/{canal_id}/{line}")
+        else:
+            lines.append(line)
+
+    return Response('\n'.join(lines),
+                    content_type='application/vnd.apple.mpegurl',
                     headers={'Cache-Control': 'no-cache'})
 
 @app.route('/movie/<usuario>/<contrasena>/<canal>')
