@@ -27,6 +27,14 @@ class MacRegistrada(db.Model):
     nombre     = db.Column(db.String(50), default='Dispositivo')
     registrada = db.Column(db.DateTime, default=datetime.utcnow)
 
+class Paquete(db.Model):
+    __tablename__ = 'paquetes'
+    id          = db.Column(db.Integer, primary_key=True)
+    nombre      = db.Column(db.String(50), unique=True, nullable=False)
+    descripcion = db.Column(db.String(200), default='')
+    categorias  = db.Column(db.Text, default='')  # IDs separados por coma
+    creado      = db.Column(db.DateTime, default=datetime.utcnow)
+
 class LogAcceso(db.Model):
     __tablename__ = 'logs_acceso'
     id          = db.Column(db.Integer, primary_key=True)

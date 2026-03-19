@@ -106,6 +106,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <button class="nav-item" onclick="showPage('clientes',this)"><span>👤</span>Clientes CRM</button>
     <button class="nav-item" onclick="showPage('logs',this)"><span>📋</span>Logs de acceso</button>
     <button class="nav-item" onclick="showPage('whatsapp',this)"><span>💬</span>WhatsApp</button>
+    <button class="nav-item" onclick="showPage('paquetes',this)"><span>📦</span>Paquetes</button>
   </nav>
   <div class="sidebar-footer">
     <button class="btn-logout" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
@@ -183,6 +184,25 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;min-width:130px;text-align:right">Fecha</span>
       </div>
       <div id="lista-logs"><div style="padding:32px;text-align:center;color:var(--muted)">Cargando...</div></div>
+    </div>
+  </div>
+
+  <!-- PAQUETES -->
+  <div class="page" id="page-paquetes">
+    <div class="page-title">📦 Paquetes de contenido</div>
+    <div class="card">
+      <div class="card-title">Paquetes activos</div>
+      <div id="paquetes-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px"></div>
+      <button class="btn btn-primary btn-sm" onclick="mostrarNuevoPaquete()">+ Nuevo paquete</button>
+    </div>
+    <div class="card" id="card-categorias" style="display:none">
+      <div class="card-title" id="cat-titulo">Categorías del paquete</div>
+      <div style="margin-bottom:12px;font-size:13px;color:var(--muted)">Selecciona las categorías que incluye este paquete:</div>
+      <div id="cat-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px;margin-bottom:16px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="guardarPaquete()">💾 Guardar</button>
+        <button class="btn btn-ghost" onclick="cancelarPaquete()">Cancelar</button>
+      </div>
     </div>
   </div>
 
@@ -479,6 +499,94 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
         res.innerHTML = `<span style="color:var(--red)">❌ ${d.error || 'No se pudo enviar. ¿WhatsApp conectado?'}</span>`;
       }
     } catch(e) { res.innerHTML = '<span style="color:var(--red)">❌ Error</span>'; }
+  }
+
+  let _categorias = [];
+  let _editandoPaquete = null;
+  let _nuevoPaqueteNombre = '';
+
+  async function cargarPaquetes() {
+    const [rP, rC] = await Promise.all([
+      fetch(API + '/admin/paquetes'),
+      fetch(API + '/admin/categorias-proveedor')
+    ]);
+    const paquetes = await rP.json();
+    _categorias = await rC.json();
+
+    const lista = document.getElementById('paquetes-lista');
+    if (!paquetes.length) {
+      lista.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin paquetes</p>';
+      return;
+    }
+    lista.innerHTML = paquetes.map(p => {
+      const cats = p.categorias ? p.categorias.split(',').length : 0;
+      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px">
+        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.nombre}</div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${p.descripcion || 'Sin descripción'}</div>
+        <div style="font-size:12px;color:var(--accent);margin-bottom:12px">${cats} categorías</div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-ghost btn-sm" onclick="editarPaquete(${p.id},'${p.nombre}','${p.descripcion}','${p.categorias}')">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm" onclick="eliminarPaquete(${p.id},'${p.nombre}')">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  function mostrarNuevoPaquete() {
+    _editandoPaquete = null;
+    _nuevoPaqueteNombre = prompt('Nombre del paquete (ej: basico, premium):');
+    if (!_nuevoPaqueteNombre) return;
+    mostrarCategorias([], _nuevoPaqueteNombre + ' — nuevo paquete');
+  }
+
+  function editarPaquete(id, nombre, desc, cats) {
+    _editandoPaquete = { id, nombre, desc };
+    const seleccionadas = cats ? cats.split(',') : [];
+    mostrarCategorias(seleccionadas, 'Editando: ' + nombre);
+  }
+
+  function mostrarCategorias(seleccionadas, titulo) {
+    document.getElementById('cat-titulo').textContent = titulo;
+    document.getElementById('card-categorias').style.display = 'block';
+    const lista = document.getElementById('cat-lista');
+    lista.innerHTML = _categorias.map(c => {
+      const checked = seleccionadas.includes(String(c.category_id)) ? 'checked' : '';
+      return `<label style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:13px">
+        <input type="checkbox" value="${c.category_id}" ${checked} style="width:16px;height:16px;cursor:pointer">
+        <span>${c.category_name}</span>
+      </label>`;
+    }).join('');
+    document.getElementById('card-categorias').scrollIntoView({behavior:'smooth'});
+  }
+
+  async function guardarPaquete() {
+    const checks = document.querySelectorAll('#cat-lista input[type=checkbox]:checked');
+    const cats = Array.from(checks).map(c => c.value).join(',');
+
+    if (_editandoPaquete) {
+      await fetch(API + `/admin/paquetes/${_editandoPaquete.id}`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({categorias: cats})
+      });
+    } else {
+      const desc = prompt('Descripción del paquete:', '');
+      await fetch(API + '/admin/paquetes', {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({nombre: _nuevoPaqueteNombre, descripcion: desc || '', categorias: cats})
+      });
+    }
+    document.getElementById('card-categorias').style.display = 'none';
+    await cargarPaquetes();
+  }
+
+  function cancelarPaquete() {
+    document.getElementById('card-categorias').style.display = 'none';
+  }
+
+  async function eliminarPaquete(id, nombre) {
+    if (!confirm(`¿Eliminar el paquete "${nombre}"?`)) return;
+    await fetch(API + `/admin/paquetes/${id}`, {method:'DELETE'});
+    await cargarPaquetes();
   }
 
   cargarStats();

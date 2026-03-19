@@ -6,7 +6,7 @@ from urllib.parse import urlparse, parse_qs
 import requests, secrets, os, threading, time, tempfile, shutil, logging, subprocess
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [HLS] %(message)s')
 hls_log = logging.getLogger('hls')
-from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso
+from models import db, Usuario, MacRegistrada, SesionActiva, Pago, LogAcceso, Paquete
 
 app = Flask(__name__)
 CORS(app)
@@ -796,6 +796,67 @@ def resumen_pagos():
     })
 
 # ════════════════════════════════════════════════════════════════
+#  PAQUETES DE CONTENIDO
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/admin/paquetes', methods=['GET'])
+@admin_requerido
+def listar_paquetes():
+    paquetes = Paquete.query.all()
+    return jsonify([{
+        'id':          p.id,
+        'nombre':      p.nombre,
+        'descripcion': p.descripcion,
+        'categorias':  p.categorias
+    } for p in paquetes])
+
+@app.route('/admin/paquetes', methods=['POST'])
+@admin_requerido
+def crear_paquete():
+    data = request.json
+    if Paquete.query.filter_by(nombre=data['nombre']).first():
+        return jsonify({'error': 'Ya existe un paquete con ese nombre'}), 400
+    p = Paquete(
+        nombre      = data['nombre'],
+        descripcion = data.get('descripcion', ''),
+        categorias  = data.get('categorias', '')
+    )
+    db.session.add(p)
+    db.session.commit()
+    return jsonify({'ok': True, 'id': p.id})
+
+@app.route('/admin/paquetes/<int:pid>', methods=['PUT'])
+@admin_requerido
+def actualizar_paquete(pid):
+    p = Paquete.query.get_or_404(pid)
+    data = request.json
+    if 'descripcion' in data: p.descripcion = data['descripcion']
+    if 'categorias'  in data: p.categorias  = data['categorias']
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/admin/paquetes/<int:pid>', methods=['DELETE'])
+@admin_requerido
+def eliminar_paquete(pid):
+    p = Paquete.query.get_or_404(pid)
+    db.session.delete(p)
+    db.session.commit()
+    return jsonify({'ok': True})
+
+@app.route('/admin/categorias-proveedor')
+@admin_requerido
+def categorias_proveedor():
+    """Obtiene categorías live del proveedor"""
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    try:
+        resp = requests.get(f"{base_prov}/player_api.php",
+            params={'username': prov_user, 'password': prov_pass, 'action': 'get_live_categories'},
+            timeout=15)
+        return Response(resp.content, content_type='application/json')
+    except Exception:
+        return jsonify([])
+
+# ════════════════════════════════════════════════════════════════
 #  ESTADÍSTICAS
 # ════════════════════════════════════════════════════════════════
 
@@ -895,6 +956,29 @@ def panel():
 
 with app.app_context():
     db.create_all()
+    # Crear paquetes por defecto si no existen
+    if Paquete.query.count() == 0:
+        paquetes_default = [
+            Paquete(
+                nombre='basico',
+                descripcion='TV Colombia + Noticias + Kids + Entretenimiento',
+                categorias='61,174,126,97,177,194,87,139,99'
+            ),
+            Paquete(
+                nombre='premium',
+                descripcion='Todo Basico + Deportes + Latinoamerica + Cine',
+                categorias='61,174,126,97,177,194,87,139,99,197,77,149,147,74,73,63,69,60,70,71,84,75,162,122,62,64,65,66,67,143,72,157,184,164'
+            ),
+            Paquete(
+                nombre='familiar',
+                descripcion='Todo Premium + USA + Eventos + Exclusivos',
+                categorias='61,174,126,97,177,194,87,139,99,197,77,149,147,74,73,63,69,60,70,71,84,75,162,122,62,64,65,66,67,143,72,157,184,164,88,79,76,115,114,131,169,170,198,217,218,219,80,81,210,220,224,129,178,187,205,196,211,204,216,221,83,193,225,223'
+            ),
+        ]
+        for p in paquetes_default:
+            db.session.add(p)
+        db.session.commit()
+        print("Paquetes por defecto creados")
     init_relay_cleanup()
 
 if __name__ == '__main__':
