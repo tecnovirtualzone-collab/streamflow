@@ -192,10 +192,47 @@ def init_relay_cleanup():
     import gevent
     gevent.spawn(cleanup_relays)
 
-PAQUETES = {
-    'basico':   {'max_conexiones': 1},
-    'premium':  {'max_conexiones': 2},
-    'familiar': {'max_conexiones': 3},
+# Pantallas disponibles (independiente del paquete de contenido)
+PANTALLAS = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
+
+# Paquetes por defecto con categorías por NOMBRE (independiente del proveedor)
+PAQUETES_DEFAULT = {
+    'basico': {
+        'descripcion': 'TV Colombia + Noticias + Kids + Entretenimiento',
+        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL']
+    },
+    'premium': {
+        'descripcion': 'Basico + Deportes + Latinoamerica + Cine',
+        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
+                               'DEPORTES LATINOS', 'DEPORTES PREMIUM', 'FORMULA 1',
+                               'LIGAS SUDAMERICANAS', 'ARGENTINA', 'CHILE', 'MEXICO',
+                               'VENEZUELA', 'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
+                               'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
+                               'CINE PREMIUM', 'VIX TV', 'PLUTO MX']
+    },
+    'familiar': {
+        'descripcion': 'Premium + USA + Eventos + Exclusivos',
+        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
+                               'DEPORTES LATINOS', 'DEPORTES PREMIUM', 'FORMULA 1',
+                               'LIGAS SUDAMERICANAS', 'ARGENTINA', 'CHILE', 'MEXICO',
+                               'VENEZUELA', 'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
+                               'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
+                               'CINE PREMIUM', 'VIX TV', 'PLUTO MX',
+                               'USA ENTERTAINMENT', 'USA SPORTS', 'USA PREMIUM',
+                               'USA NEWS', 'USA KIDS', 'USA LATINO',
+                               'NBA EVENTOS', 'MLB EVENTOS', 'NCAA EVENTOS',
+                               'EVENTOS DE FUTBOL', 'EVENTOS DEPORTIVOS 1',
+                               'PPV-WWE', 'UFC', 'CANALES EXCLUSIVOS',
+                               'CANALES EXCLUSIVOS USA', 'LA CASA DE LOS FAMOSOS',
+                               'GRAN HERMANO', 'TELEMUNDO', 'UNIVISION',
+                               'DEPORTES INTERNACIONALES', 'TUBI TV']
+    }
 }
 
 # ════════════════════════════════════════════════════════════════
