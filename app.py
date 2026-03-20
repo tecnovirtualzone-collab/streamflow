@@ -199,39 +199,49 @@ PANTALLAS = {1: 1, 2: 2, 3: 3, 4: 4, 5: 5}
 PAQUETES_DEFAULT = {
     'basico': {
         'descripcion': 'TV Colombia + Noticias + Kids + Entretenimiento',
-        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
-                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
-                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL']
+        'categorias_nombres': [
+            'COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+            'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+            'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
+            'REALITYS', 'TELEMUNDO', 'UNIVISION', 'VIX'
+        ]
     },
     'premium': {
         'descripcion': 'Basico + Deportes + Latinoamerica + Cine',
-        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
-                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
-                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
-                               'DEPORTES LATINOS', 'DEPORTES PREMIUM', 'FORMULA 1',
-                               'LIGAS SUDAMERICANAS', 'ARGENTINA', 'CHILE', 'MEXICO',
-                               'VENEZUELA', 'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
-                               'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
-                               'CINE PREMIUM', 'VIX TV', 'PLUTO MX']
+        'categorias_nombres': [
+            'COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+            'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+            'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
+            'REALITYS', 'TELEMUNDO', 'UNIVISION', 'VIX',
+            'DEPORTES', 'FORMULA 1', 'LIGAS', 'FUTBOL',
+            'ARGENTINA', 'CHILE', 'MEXICO', 'VENEZUELA',
+            'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
+            'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
+            'GUATEMALA', 'HONDURAS', 'EL SALVADOR', 'NICARAGUA',
+            'CUBA', 'PUERTO RICO', 'REPUBLICA DOMINICANA',
+            'CINE', 'PLUTO', 'TUBI', 'ITALIA', 'ESPANA'
+        ]
     },
     'familiar': {
         'descripcion': 'Premium + USA + Eventos + Exclusivos',
-        'categorias_nombres': ['COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
-                               'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
-                               'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
-                               'DEPORTES LATINOS', 'DEPORTES PREMIUM', 'FORMULA 1',
-                               'LIGAS SUDAMERICANAS', 'ARGENTINA', 'CHILE', 'MEXICO',
-                               'VENEZUELA', 'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
-                               'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
-                               'CINE PREMIUM', 'VIX TV', 'PLUTO MX',
-                               'USA ENTERTAINMENT', 'USA SPORTS', 'USA PREMIUM',
-                               'USA NEWS', 'USA KIDS', 'USA LATINO',
-                               'NBA EVENTOS', 'MLB EVENTOS', 'NCAA EVENTOS',
-                               'EVENTOS DE FUTBOL', 'EVENTOS DEPORTIVOS 1',
-                               'PPV-WWE', 'UFC', 'CANALES EXCLUSIVOS',
-                               'CANALES EXCLUSIVOS USA', 'LA CASA DE LOS FAMOSOS',
-                               'GRAN HERMANO', 'TELEMUNDO', 'UNIVISION',
-                               'DEPORTES INTERNACIONALES', 'TUBI TV']
+        'categorias_nombres': [
+            'COLOMBIA', 'NOTICIAS', 'KIDS', 'INFANTIL',
+            'ENTRETENIMIENTO', 'RELIGION', 'MUSICA',
+            'CANALES 24/7', 'CULTURA', 'CANALES 24/7 INFANTIL',
+            'REALITYS', 'TELEMUNDO', 'UNIVISION', 'VIX',
+            'DEPORTES', 'FORMULA 1', 'LIGAS', 'FUTBOL',
+            'ARGENTINA', 'CHILE', 'MEXICO', 'VENEZUELA',
+            'PERU', 'ECUADOR', 'BOLIVIA', 'BRASIL',
+            'URUGUAY', 'PARAGUAY', 'COSTA RICA', 'PANAMA',
+            'GUATEMALA', 'HONDURAS', 'EL SALVADOR', 'NICARAGUA',
+            'CUBA', 'PUERTO RICO', 'REPUBLICA DOMINICANA',
+            'CINE', 'PLUTO', 'TUBI', 'ITALIA', 'ESPANA',
+            'USA', 'NBA', 'NFL', 'MLB', 'NHL', 'NCAA',
+            'PPV', 'WWE', 'UFC', 'EVENTOS',
+            'EXCLUSIVOS', 'CASA DE LOS FAMOSOS', 'GRAN HERMANO',
+            'ADULTO', 'ARABIA', 'KODIMAX', 'CANALES IZZI',
+            'CANADA', 'ALERT'
+        ]
     }
 }
 
