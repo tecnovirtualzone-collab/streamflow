@@ -986,6 +986,21 @@ def wa_notify_expiring():
 #  PANEL ADMIN — FRONTEND
 # ════════════════════════════════════════════════════════════════
 
+# ════════════════════════════════════════════════════════════════
+#  TV APP — Reproductor Web PWA
+# ════════════════════════════════════════════════════════════════
+
+@app.route('/tv/')
+@app.route('/tv')
+def tv_app():
+    from flask import send_from_directory
+    return send_from_directory('tv', 'index.html')
+
+@app.route('/tv/<path:filename>')
+def tv_static(filename):
+    from flask import send_from_directory
+    return send_from_directory('tv', filename)
+
 @app.route('/wa/qr')
 def wa_qr():
     try:
