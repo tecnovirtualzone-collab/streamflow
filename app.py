@@ -496,6 +496,10 @@ def live_stream_hls(usuario, contrasena, canal):
 
 @app.route('/hls/<canal_id>/<segmento>')
 def serve_hls_segment(canal_id, segmento):
+    if request.method == 'OPTIONS':
+        r = Response()
+        r.headers['Access-Control-Allow-Origin'] = '*'
+        return r
     """Sirve segmentos HLS del relay"""
     seg_path = os.path.join(HLS_DIR, canal_id, segmento)
 
@@ -520,7 +524,11 @@ def serve_hls_segment(canal_id, segmento):
             _relays[canal_id]['viewers'] = max(1, _relays[canal_id].get('viewers', 1))
 
     return Response(data, content_type='video/mp2t',
-                    headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+                    headers={
+                        'Cache-Control': 'no-cache',
+                        'X-Accel-Buffering': 'no',
+                        'Access-Control-Allow-Origin': '*'
+                    })
 
 @app.route('/hls/<canal_id>/index.m3u8')
 def serve_hls_playlist(canal_id):
@@ -550,7 +558,10 @@ def serve_hls_playlist(canal_id):
 
     return Response('\n'.join(lines),
                     content_type='application/vnd.apple.mpegurl',
-                    headers={'Cache-Control': 'no-cache'})
+                    headers={
+                        'Cache-Control': 'no-cache',
+                        'Access-Control-Allow-Origin': '*'
+                    })
 
 @app.route('/movie/<usuario>/<contrasena>/<canal>')
 @app.route('/series/<usuario>/<contrasena>/<canal>')
