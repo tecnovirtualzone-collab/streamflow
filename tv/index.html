@@ -12,6 +12,7 @@
 <link rel="apple-touch-icon" href="/tv/icon-192.png">
 <title>StreamFlow</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.4.10/hls.min.js"></script>
 <style>
 :root {
@@ -557,7 +558,7 @@ function filtrarSeries() {
 // ── PLAYER ──
 function playChannel(streamId, name, cat, icon) {
   _currentStream = streamId;
-  const url = `${API}/live/${_user}/${_pass}/${streamId}.m3u8`;
+  const url = `${API}/live/${_user}/${_pass}/${streamId}.m3u8`.replace('http://', 'https://');
   document.getElementById('player-title').textContent = name;
   document.getElementById('player-cat').textContent = cat;
   document.getElementById('player-live-badge').style.display = 'block';
@@ -571,7 +572,7 @@ function playChannel(streamId, name, cat, icon) {
 
 function playVOD(streamId, name, cat, icon, type) {
   const ext = type === 'movie' ? 'mp4' : '';
-  const url = `${API}/${type}/${_user}/${_pass}/${streamId}${ext ? '.'+ext : ''}`;
+  const url = `${API}/${type}/${_user}/${_pass}/${streamId}${ext ? '.'+ext : ''}`.replace('http://', 'https://');
   document.getElementById('player-title').textContent = name;
   document.getElementById('player-cat').textContent = cat;
   document.getElementById('player-live-badge').style.display = 'none';

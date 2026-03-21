@@ -527,7 +527,9 @@ def serve_hls_segment(canal_id, segmento):
                     headers={
                         'Cache-Control': 'no-cache',
                         'X-Accel-Buffering': 'no',
-                        'Access-Control-Allow-Origin': '*'
+                        'Access-Control-Allow-Origin': '*',
+                        'Access-Control-Allow-Headers': '*',
+                        'Access-Control-Allow-Methods': 'GET, OPTIONS'
                     })
 
 @app.route('/hls/<canal_id>/index.m3u8')
