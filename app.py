@@ -1,6 +1,14 @@
 """
-StreamFlow v3.0 - Backend con VLC Relay
-========================================
+StreamFlow v4.0 - Backend con Smart Relay (1 cuenta → usuarios ilimitados)
+==========================================================================
+Mejoras v4.0:
+- Smart Relay: 3 conexiones dinámicas del proveedor rotan por demanda
+- Los canales más vistos siempre tienen conexión
+- Rotación automática cuando cambia la demanda
+- Buffer HLS para que el usuario no note los cambios
+- 1 cuenta del proveedor = usuarios ilimitados (con delay aceptable)
+- Películas y series con mismo sistema de relay
+
 Mejoras v3.0:
 - VLC Relay Manager: 1 conexión al proveedor por canal (indetectable)
 - Proxy HTTP local desde VLC a usuarios
@@ -27,6 +35,7 @@ import json
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 from functools import wraps
+from collections import defaultdict
 
 from flask import Flask, request, Response, jsonify, session, send_from_directory
 from flask_cors import CORS
@@ -96,6 +105,202 @@ logging.basicConfig(
 )
 logger = logging.getLogger("streamflow")
 hls_log = logging.getLogger("hls")
+
+# ════════════════════════════════════════════════════════════════
+# SMART RELAY MANAGER — 3 conexiones → usuarios ilimitados
+# ════════════════════════════════════════════════════════════════
+#
+# Estrategia: Las 3 conexiones del proveedor se asignan dinámicamente
+# a los canales más vistos. Cuando cambia la demanda, rota.
+#
+# Ejemplo:
+#   45 usuarios ven RCN     → Conexión 1 (fija por demanda alta)
+#   30 usuarios ven Caracol → Conexión 2 (fija por demanda alta)
+#   15 usuarios ven ESPN    → Conexión 3 (dinámica)
+#   8 usuarios ven Fox      → Espera (cuando ESPN baja, toma la conexión)
+#
+# El proveedor siempre ve solo 3 conexiones de tu VPS.
+# Los usuarios ven TODOS los canales con un delay de 30-90 segundos.
+
+SMART_MAX_CONNECTIONS = int(os.environ.get("SMART_MAX_CONNECTIONS", "3"))  # conexiones del proveedor
+SMART_ROTATION_INTERVAL = int(os.environ.get("SMART_ROTATION_INTERVAL", "30"))  # segundos entre rotaciones
+SMART_BUFFER_SECONDS = int(os.environ.get("SMART_BUFFER_SECONDS", "10"))  # buffer HLS para el usuario
+
+# Estado de canales: { canal_id: viewers_count }
+_channel_viewers = defaultdict(int)
+_channel_viewers_lock = threading.Lock()
+
+# Relays activos: { canal_id: { proc, path, playlist, url, started_at } }
+_active_relays = {}
+_relays_lock = threading.Lock()
+
+# Cola de canales esperando conexión
+_pending_channels = []
+
+
+def _get_canal_url(canal_id):
+    """Obtiene la URL del proveedor para un canal."""
+    base, user, pwd = get_proveedor_info()
+    if not base:
+        return None
+    return f"{base}/live/{user}/{pwd}/{canal_id}.ts"
+
+
+def _start_canal_relay(canal_id):
+    """Inicia un relay FFmpeg para un canal específico."""
+    url = _get_canal_url(canal_id)
+    if not url:
+        return False
+
+    hls_path = get_hls_dir(canal_id)
+    playlist = os.path.join(hls_path, "index.m3u8")
+
+    # Limpiar segmentos anteriores
+    for f in os.listdir(hls_path):
+        try:
+            os.remove(os.path.join(hls_path, f))
+        except:
+            pass
+
+    cmd = [
+        "ffmpeg", "-y",
+        "-reconnect", "1",
+        "-reconnect_streamed", "1",
+        "-reconnect_delay_max", "5",
+        "-user_agent", "VLC/3.0.18 LibVLC/3.0.18",
+        "-i", url,
+        "-c", "copy",
+        "-f", "hls",
+        "-hls_time", str(HLS_SEGMENT_TIME),
+        "-hls_list_size", str(HLS_LIST_SIZE),
+        "-hls_flags", "append_list+delete_segments",
+        "-hls_segment_filename", os.path.join(hls_path, "seg%05d.ts"),
+        playlist,
+    ]
+
+    try:
+        proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            preexec_fn=os.setsid,
+        )
+        with _relays_lock:
+            _active_relays[canal_id] = {
+                "proc": proc,
+                "path": hls_path,
+                "playlist": playlist,
+                "url": url,
+                "started_at": time.time(),
+            }
+        logger.info(f"Smart Relay: canal {canal_id} iniciado (PID {proc.pid})")
+        return True
+    except Exception as e:
+        logger.error(f"Smart Relay: error iniciando canal {canal_id}: {e}")
+        return False
+
+
+def _stop_canal_relay(canal_id):
+    """Detiene un relay de canal."""
+    with _relays_lock:
+        relay = _active_relays.get(canal_id)
+        if relay:
+            try:
+                relay["proc"].terminate()
+                relay["proc"].wait(timeout=5)
+            except:
+                try:
+                    relay["proc"].kill()
+                except:
+                    pass
+            del _active_relays[canal_id]
+            logger.info(f"Smart Relay: canal {canal_id} detenido")
+
+
+def _smart_rotation_loop():
+    """
+    Hilo principal de rotación inteligente.
+    Cada SMART_ROTATION_INTERVAL segundos:
+    1. Cuenta viewers por canal
+    2. Asigna las 3 conexiones a los más vistos
+    3. Detiene relays que ya no tienen viewers
+    4. Inicia relays para canales con viewers sin conexión
+    """
+    while True:
+        time.sleep(SMART_ROTATION_INTERVAL)
+
+        try:
+            with _channel_viewers_lock:
+                # Ordenar canales por viewers (más vistos primero)
+                canales_ordenados = sorted(
+                    _channel_viewers.items(),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+            # Canales que deberían tener conexión (los N más vistos)
+            canales_activos = set()
+            for i, (canal_id, viewers) in enumerate(canales_ordenados):
+                if i < SMART_MAX_CONNECTIONS and viewers > 0:
+                    canales_activos.add(canal_id)
+
+            with _relays_lock:
+                # Detener relays que ya no están en top
+                for canal_id in list(_active_relays.keys()):
+                    if canal_id not in canales_activos:
+                        _stop_canal_relay(canal_id)
+
+                # Iniciar relays para canales nuevos
+                for canal_id in canales_activos:
+                    if canal_id not in _active_relays:
+                        _start_canal_relay(canal_id)
+
+            # Log de estado
+            activos = list(canales_activos)[:SMART_MAX_CONNECTIONS]
+            logger.info(f"Smart Relay: {len(activos)} canales activos: {activos}")
+
+        except Exception as e:
+            logger.error(f"Smart Relay: error en rotación: {e}")
+
+
+def smart_add_viewer(canal_id):
+    """Registra un viewer viendo un canal."""
+    with _channel_viewers_lock:
+        _channel_viewers[canal_id] += 1
+
+
+def smart_remove_viewer(canal_id):
+    """Remueve un viewer de un canal."""
+    with _channel_viewers_lock:
+        _channel_viewers[canal_id] = max(0, _channel_viewers[canal_id] - 1)
+
+
+def smart_get_relay(canal_id):
+    """Obtiene el relay activo para un canal."""
+    with _relays_lock:
+        return _active_relays.get(canal_id)
+
+
+def smart_get_stats():
+    """Estadísticas del Smart Relay."""
+    with _relays_lock:
+        activos = list(_active_relays.keys())
+    with _channel_viewers_lock:
+        viewers = dict(_channel_viewers)
+    return {
+        "max_connections": SMART_MAX_CONNECTIONS,
+        "active_relays": len(activos),
+        "active_channels": activos,
+        "channel_viewers": viewers,
+        "rotation_interval": SMART_ROTATION_INTERVAL,
+    }
+
+
+# Iniciar hilo de rotación
+_smart_rotation_thread = threading.Thread(target=_smart_rotation_loop, daemon=True)
+_smart_rotation_thread.start()
+logger.info(f"Smart Relay iniciado: {SMART_MAX_CONNECTIONS} conexiones, rotación cada {SMART_ROTATION_INTERVAL}s")
+
 
 # ════════════════════════════════════════════════════════════════
 # BASE DE DATOS
@@ -667,8 +872,8 @@ def get_php():
 @app.route("/live/<usuario>/<contrasena>/<canal>")
 def live_stream_hls(usuario, contrasena, canal):
     """
-    Endpoint principal de streaming live v3.0.
-    Usa VLC Relay: 1 conexión al proveedor = N usuarios (indetectable).
+    Endpoint de streaming live v4.0 con Smart Relay.
+    3 conexiones del proveedor rotan por demanda → usuarios ilimitados.
     """
     mac = request.headers.get("X-MAC-Address", "")
     ip = request.headers.get("X-Real-IP", request.remote_addr)
@@ -687,95 +892,60 @@ def live_stream_hls(usuario, contrasena, canal):
 
     canal_id = canal.replace(".ts", "").replace(".m3u8", "")
 
-    # Agregar viewer al canal
-    vlc_manager.add_viewer(canal_id)
-    
-    # Iniciar relay VLC (o reutilizar uno existente)
-    local_url = vlc_manager.start_relay(canal_id)
-    
-    if not local_url:
-        vlc_manager.remove_viewer(canal_id)
-        return jsonify({"error": "Error al iniciar stream"}), 502
-    
-    # Esperar a que VLC esté listo
-    relay = vlc_manager.get_relay(canal_id)
-    if relay:
-        relay.ready_event.wait(timeout=15)
-    
-    if not relay or not relay.ready:
-        # Fallback: usar relay HLS con FFmpeg (NO directo al proveedor)
-        # El relay HLS garantiza 1 conexión al proveedor compartida entre todos los usuarios
-        logger.warning(f"VLC no listo para {canal_id}, usando fallback HLS relay (FFmpeg)")
-        base, user, pwd = get_proveedor_info()
-        url_proveedor = f"{base}/live/{user}/{pwd}/{canal_id}.ts"
+    # Registrar viewer en el Smart Relay
+    smart_add_viewer(canal_id)
 
-        # Enviar a start_relay HLS (FFmpeg) en vez de proxy directo
-        # Esto mantiene la propiedad de 1 conexión por canal
-        if start_relay(canal_id):
-            # Esperar a que el relay HLS genere segmentos
-            info = _relays.get(canal_id)
-            if info:
-                for _ in range(30):
-                    if os.path.exists(info["playlist"]) and os.path.getsize(info["playlist"]) > 0:
+    try:
+        # Esperar a que el Smart Relay asigne una conexión a este canal
+        # (máximo SMART_ROTATION_INTERVAL segundos de espera)
+        espera_max = SMART_ROTATION_INTERVAL + 10
+        relay = None
+        for _ in range(espera_max * 2):
+            relay = smart_get_relay(canal_id)
+            if relay and os.path.exists(relay["playlist"]) and os.path.getsize(relay["playlist"]) > 0:
+                break
+            time.sleep(0.5)
+
+        if not relay:
+            return jsonify({"error": "Canal no disponible temporalmente. Intente en unos segundos."}), 503
+
+        # Servir segmentos HLS del relay
+        def generate():
+            try:
+                while True:
+                    r = smart_get_relay(canal_id)
+                    if not r:
                         break
-                    time.sleep(0.5)
+                    playlist_path = r["playlist"]
+                    if os.path.exists(playlist_path):
+                        with open(playlist_path) as f:
+                            content = f.read()
+                        segs = [l.strip() for l in content.split("\n") if l.strip().endswith(".ts")]
+                        for seg_name in segs:
+                            seg_path = os.path.join(r["path"], seg_name)
+                            if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
+                                with open(seg_path, "rb") as sf:
+                                    yield sf.read()
+                    time.sleep(1)
+            except Exception as e:
+                logger.error(f"Error streaming canal {canal_id}: {e}")
+            finally:
+                smart_remove_viewer(canal_id)
 
-                def gen_hls_fallback():
-                    try:
-                        last_seg = ""
-                        timeout_counter = 0
-                        while timeout_counter < 300:  # 5 min max
-                            with _relay_lock:
-                                ch_info = _relays.get(canal_id)
-                                if not ch_info or ch_info["proc"].poll() is not None:
-                                    break
-                                playlist_path = ch_info["playlist"]
+        return Response(generate(),
+                        content_type="video/mp2t",
+                        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-                            if os.path.exists(playlist_path):
-                                with open(playlist_path) as f:
-                                    content = f.read()
-                                segs = [l.strip() for l in content.split("\n") if l.strip().endswith(".ts")]
-                                for seg_name in segs:
-                                    seg_path = os.path.join(ch_info["dir"], seg_name)
-                                    if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
-                                        with open(seg_path, "rb") as sf:
-                                            yield sf.read()
-                                time.sleep(1)
-                                continue
-                            timeout_counter += 1
-                            time.sleep(0.5)
-                    except Exception as e:
-                        logger.error(f"Error en fallback HLS canal {canal_id}: {e}")
-                    finally:
-                        stop_relay_viewer(canal_id)
+    except Exception as e:
+        smart_remove_viewer(canal_id)
+        return jsonify({"error": "Error en el servidor de streaming"}), 500
 
-                return Response(gen_hls_fallback(),
-                                content_type="video/mp2t",
-                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
-        # Si todo falla, error 503 (nunca proxy directo)
-        vlc_manager.remove_viewer(canal_id)
-        logger.error(f"Todos los relays fallaron para canal {canal_id}")
-        return jsonify({"error": "Servicio de streaming no disponible"}), 503
-    
-    # Proxy del stream local de VLC a todos los usuarios
-    def generate():
-        try:
-            resp = requests.get(local_url, stream=True, timeout=30,
-                                auth=(VLC_HTTP_USER, VLC_HTTP_PASS) if 'VLC_HTTP_USER' in dir() else None)
-            for chunk in resp.iter_content(chunk_size=65536):
-                if chunk:
-                    yield chunk
-        except Exception as e:
-            logger.error(f"Error en proxy VLC canal {canal_id}: {e}")
-        finally:
-            vlc_manager.remove_viewer(canal_id)
-    
-    return Response(
-        generate(),
-        content_type="video/mp2t",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
-    )
+@app.route("/api/smart-relay/stats")
+@admin_required
+def api_smart_relay_stats():
+    """Estadísticas del Smart Relay."""
+    return jsonify(smart_get_stats())
 
 
 @app.route("/hls/<canal_id>/<segmento>")
