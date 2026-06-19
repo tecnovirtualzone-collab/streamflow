@@ -302,11 +302,11 @@ class ChannelManager:
                 )
 
                 # 3. Contar canales sin fuente premium activa
+                from sqlalchemy import and_
                 canales_sin_fuente = CanalLogico.query.filter(
                     CanalLogico.activo == True,
                     ~CanalLogico.fuentes.any(
-                        CanalFuente.activo == True,
-                        CanalFuente.proveedor != "gratuito"
+                        and_(CanalFuente.activo == True, CanalFuente.proveedor != "gratuito")
                     )
                 ).count()
 
@@ -528,8 +528,8 @@ class ChannelManager:
                 proveedor="gratuito", activo=True
             ).count()
             canales_caidos = CanalFuente.query.filter_by(estado="caido", activo=True).count()
-            proveedores = db.session.query(
-                CanalFuente.proveedor, db.func.count(CanalFuente.id)
+            proveedores = self.db.session.query(
+                CanalFuente.proveedor, self.db.func.count(CanalFuente.id)
             ).filter_by(activo=True).group_by(CanalFuente.proveedor).all()
 
             return {
