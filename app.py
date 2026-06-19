@@ -1,12 +1,17 @@
 """
-StreamFlow v2.0 - Backend Mejorado
-===================================
-Mejoras:
+StreamFlow v3.0 - Backend con VLC Relay
+========================================
+Mejoras v3.0:
+- VLC Relay Manager: 1 conexión al proveedor por canal (indetectable)
+- Proxy HTTP local desde VLC a usuarios
+- Auto-start/stop de VLC por canal
+- Health checks y auto-reconnect
+- Optimizado para 100-200 usuarios en VPS 8GB/2CPU
+
+Mejoras v2.0:
 - Seguridad: JWT auth, rate limiting, secrets management
-- Anti-bloqueo: Relay HLS compartido, conexión única al proveedor por canal
-- Arquitectura modular
+- Cache de M3U
 - Panel admin mejorado
-- Sistema de cache de M3U
 """
 
 import os
@@ -30,6 +35,9 @@ from flask_limiter.util import get_remote_address
 from werkzeug.security import generate_password_hash, check_password_hash
 import requests
 import jwt
+
+# VLC Relay Manager
+from vlc_manager import vlc_manager
 
 # ════════════════════════════════════════════════════════════════
 # CONFIGURACIÓN
@@ -61,7 +69,13 @@ app.secret_key = os.environ.get("SECRET_KEY", secrets.token_hex(32))
 JWT_SECRET = os.environ.get("JWT_SECRET", secrets.token_hex(32))
 JWT_EXPIRY_HOURS = int(os.environ.get("JWT_EXPIRY_HOURS", "24"))
 
-# Admin credentials desde env
+VLC_HTTP_PORT = int(os.environ.get("VLC_HTTP_PORT", "8888"))
+VLC_HTTP_USER = os.environ.get("VLC_HTTP_USER", "streamflow")
+VLC_HTTP_PASS = os.environ.get("VLC_HTTP_PASS", "sf_vlc_2026")
+VLC_TIMEOUT = int(os.environ.get("VLC_TIMEOUT", "60"))
+VLC_MAX_CHANNELS = int(os.environ.get("VLC_MAX_CHANNELS", "8"))
+
+# Admin credentials from env
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH", "")
 
@@ -653,8 +667,8 @@ def get_php():
 @app.route("/live/<usuario>/<contrasena>/<canal>")
 def live_stream_hls(usuario, contrasena, canal):
     """
-    Endpoint principal de streaming live.
-    Usa relay HLS compartido: 1 conexión al proveedor = N usuarios.
+    Endpoint principal de streaming live v3.0.
+    Usa VLC Relay: 1 conexión al proveedor = N usuarios (indetectable).
     """
     mac = request.headers.get("X-MAC-Address", "")
     ip = request.headers.get("X-Real-IP", request.remote_addr)
@@ -673,22 +687,26 @@ def live_stream_hls(usuario, contrasena, canal):
 
     canal_id = canal.replace(".ts", "").replace(".m3u8", "")
 
-    # Arrancar relay (o reutilizar uno existente)
-    if not start_relay(canal_id):
+    # Agregar viewer al canal
+    vlc_manager.add_viewer(canal_id)
+    
+    # Iniciar relay VLC (o reutilizar uno existente)
+    local_url = vlc_manager.start_relay(canal_id)
+    
+    if not local_url:
+        vlc_manager.remove_viewer(canal_id)
         return jsonify({"error": "Error al iniciar stream"}), 502
-
-    # Esperar a que el relay esté listo
-    for _ in range(40):
-        info = _relays.get(canal_id)
-        if info and info.get("ready"):
-            break
-        time.sleep(0.2)
-
-    info = _relays.get(canal_id)
-    if not info or not info.get("ready"):
-        # Fallback: proxy directo
-        stop_relay_viewer(canal_id)
-        url_proveedor = get_proveedor_url(canal_id)
+    
+    # Esperar a que VLC esté listo
+    relay = vlc_manager.get_relay(canal_id)
+    if relay:
+        relay.ready_event.wait(timeout=15)
+    
+    if not relay or not relay.ready:
+        # Fallback: proxy directo al proveedor
+        logger.warning(f"VLC no listo para {canal_id}, usando fallback directo")
+        base, user, pwd = get_proveedor_info()
+        url_proveedor = f"{base}/live/{user}/{pwd}/{canal_id}.ts"
         try:
             resp = requests.get(url_proveedor, stream=True, timeout=15,
                                 headers={"User-Agent": "VLC/3.0.18"})
@@ -699,57 +717,30 @@ def live_stream_hls(usuario, contrasena, canal):
                             yield chunk
                 except:
                     pass
+                finally:
+                    vlc_manager.remove_viewer(canal_id)
             return Response(gen_fallback(),
                             content_type="video/mp2t",
                             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
         except:
+            vlc_manager.remove_viewer(canal_id)
             return jsonify({"error": "Error al conectar"}), 502
-
-    # Stream HLS: leer segmentos y enviarlos como TS continuo
-    def generate_ts():
-        seg_index = 0
-        consecutive_errors = 0
+    
+    # Proxy del stream local de VLC a todos los usuarios
+    def generate():
         try:
-            while consecutive_errors < 10:
-                with _relay_lock:
-                    if canal_id in _relays:
-                        _relays[canal_id]["last_view"] = time.time()
-                        _relays[canal_id]["viewers"] = max(1, _relays[canal_id].get("viewers", 1))
-                    else:
-                        break
-
-                seg_path = os.path.join(HLS_DIR, canal_id, f"seg{seg_index:05d}.ts")
-
-                # Esperar por el segmento
-                found = False
-                for _ in range(20):
-                    if os.path.exists(seg_path) and os.path.getsize(seg_path) > 10000:
-                        found = True
-                        break
-                    time.sleep(0.2)
-
-                if not found:
-                    consecutive_errors += 1
-                    time.sleep(0.5)
-                    continue
-
-                consecutive_errors = 0
-                try:
-                    with open(seg_path, "rb") as f:
-                        while True:
-                            chunk = f.read(65536)
-                            if not chunk:
-                                break
-                            yield chunk
-                except:
-                    break
-
-                seg_index += 1
+            resp = requests.get(local_url, stream=True, timeout=30,
+                                auth=(VLC_HTTP_USER, VLC_HTTP_PASS) if 'VLC_HTTP_USER' in dir() else None)
+            for chunk in resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        except Exception as e:
+            logger.error(f"Error en proxy VLC canal {canal_id}: {e}")
         finally:
-            stop_relay_viewer(canal_id)
-
+            vlc_manager.remove_viewer(canal_id)
+    
     return Response(
-        generate_ts(),
+        generate(),
         content_type="video/mp2t",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
