@@ -356,6 +356,93 @@ class Paquete(db.Model):
     creado = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# ════════════════════════════════════════════════════════════════
+# MODELOS DE CANALES LÓGICOS Y FUENTES
+# ════════════════════════════════════════════════════════════════
+# Un "canal lógico" es el canal que ve el usuario (ej: "RCN").
+# Una "fuente" es la URL real de ese canal en un proveedor.
+#
+# Cuando el admin cambia de proveedor:
+#   1. Las fuentes del proveedor anterior se marcan inactivas
+#   2. Se cargan los canales del nuevo proveedor
+#   3. Se vinculan automáticamente por nombre a los canales lógicos
+#   4. Si un canal no existe en el nuevo proveedor, usa backup gratuito
+
+class CanalLogico(db.Model):
+    """Canal que ve el usuario. Independiente del proveedor."""
+    __tablename__ = "canales_logicos"
+    id = db.Column(db.Integer, primary_key=True)
+    canal_id = db.Column(db.String(100), unique=True, nullable=False)  # ej: "rcn", "caracol"
+    nombre = db.Column(db.String(200), nullable=False)  # ej: "RCN Televisión"
+    display_name = db.Column(db.String(200), default="")  # ej: "RCN"
+    grupo = db.Column(db.String(100), default="")  # ej: "Colombia", "Deportes"
+    logo = db.Column(db.String(500), default="")
+    pais = db.Column(db.String(50), default="")
+    prioridad = db.Column(db.Integer, default=100)  # menor = más arriba en la lista
+    activo = db.Column(db.Boolean, default=True)
+    creado = db.Column(db.DateTime, default=datetime.utcnow)
+    actualizado = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relación con fuentes
+    fuentes = db.relationship("CanalFuente", backref="canal_logico", lazy="dynamic",
+                               cascade="all, delete-orphan")
+
+    def get_fuente_activa(self):
+        """Retorna la mejor fuente activa para este canal."""
+        return self.fuentes.filter_by(activo=True).order_by(CanalFuente.prioridad).first()
+
+    def get_todas_fuentes_activas(self):
+        """Retorna todas las fuentes activas ordenadas por prioridad."""
+        return self.fuentes.filter_by(activo=True).order_by(CanalFuente.prioridad).all()
+
+    def to_dict(self):
+        fuente = self.get_fuente_activa()
+        return {
+            "id": self.id,
+            "canal_id": self.canal_id,
+            "nombre": self.nombre,
+            "display_name": self.display_name or self.nombre,
+            "grupo": self.grupo,
+            "logo": self.logo,
+            "pais": self.pais,
+            "prioridad": self.prioridad,
+            "activo": self.activo,
+            "fuente_activa": fuente.to_dict() if fuente else None,
+            "fuentes_count": self.fuentes.filter_by(activo=True).count(),
+        }
+
+
+class CanalFuente(db.Model):
+    """URL real de un canal en un proveedor específico."""
+    __tablename__ = "canales_fuentes"
+    id = db.Column(db.Integer, primary_key=True)
+    canal_logico_id = db.Column(db.Integer, db.ForeignKey("canales_logicos.id"), nullable=False)
+    proveedor = db.Column(db.String(100), nullable=False)  # "proveedor1", "gratuito", etc.
+    url = db.Column(db.Text, nullable=False)  # URL real del stream
+    nombre_fuente = db.Column(db.String(200), default="")  # Nombre en el proveedor
+    prioridad = db.Column(db.Integer, default=1)  # 1=premium, 2=backup, 3=gratuito
+    activo = db.Column(db.Boolean, default=True)
+    estado = db.Column(db.String(20), default="ok")  # ok, caido, reemplazado
+    ultimo_check = db.Column(db.DateTime)
+    ultimo_error = db.Column(db.String(500), default="")
+    vez_usado = db.Column(db.Integer, default=0)
+    creado = db.Column(db.DateTime, default=datetime.utcnow)
+    actualizado = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "proveedor": self.proveedor,
+            "url": self.url if self.activo else None,
+            "nombre_fuente": self.nombre_fuente,
+            "prioridad": self.prioridad,
+            "activo": self.activo,
+            "estado": self.estado,
+            "ultimo_check": self.ultimo_check.isoformat() if self.ultimo_check else None,
+            "ultimo_error": self.ultimo_error,
+        }
+
+
 class LogAcceso(db.Model):
     __tablename__ = "logs_acceso"
     id = db.Column(db.Integer, primary_key=True)
@@ -1570,9 +1657,14 @@ with app.app_context():
         logger.info("Paquetes por defecto creados")
     init_relay_cleanup()
 
+    # Inicializar Channel Manager
+    from channel_manager import init_channel_manager
+    init_channel_manager(db, app)
+    logger.info("Channel Manager iniciado")
+
 
 # ════════════════════════════════════════════════════════════════
-# GESTIÓN DE CANALES POR PANEL ADMIN
+# APIs DE GESTIÓN DE CANALES (Panel Admin)
 # ════════════════════════════════════════════════════════════════
 # Sistema para que el admin pueda:
 # 1. Ver todos los canales (proveedor + listas gratuitas)
