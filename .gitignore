@@ -1,0 +1,13 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+test.db
+instance/
+*.log
+.DS_Store
+Thumbs.db
+get-pip.py
+run_tests.py
+start_test.sh
+test.sh

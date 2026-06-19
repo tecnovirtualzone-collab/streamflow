@@ -22,7 +22,7 @@ WORKDIR /app
 
 # Python deps
 COPY requirements.txt .
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Node deps
 COPY wa-service/package*.json ./wa-service/

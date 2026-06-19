@@ -109,7 +109,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <button class="nav-item" onclick="showPage('paquetes',this)"><span>📦</span>Paquetes</button>
   </nav>
   <div class="sidebar-footer">
-    <button class="btn-logout" onclick="window.location.href='/panel/logout'">🚪 Cerrar sesión</button>
+    <button class="btn-logout" onclick="logout()">🚪 Cerrar sesión</button>
   </div>
 </div>
 
@@ -312,6 +312,30 @@ tr:hover td{background:rgba(255,255,255,.015)}
 const API = window.location.origin;
 let lastCreds = {}, pagoUsuarioId = null, chartInst = null;
 
+// JWT Auth helper
+function getAuthHeaders() {
+  const token = localStorage.getItem('sf_token');
+  return token ? {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'} : {'Content-Type': 'application/json'};
+}
+
+async function authFetch(url, opts = {}) {
+  const headers = getAuthHeaders();
+  const r = await fetch(url, {...opts, headers: {...headers, ...(opts.headers || {})}});
+  if (r.status === 401) {
+    localStorage.removeItem('sf_token');
+    localStorage.removeItem('sf_user');
+    window.location.href = '/panel/login';
+    return null;
+  }
+  return r;
+}
+
+function logout(){
+  localStorage.removeItem('sf_token');
+  localStorage.removeItem('sf_user');
+  window.location.href = '/panel/login';
+}
+
 function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('open')}
 function cerrarModal(id){document.getElementById(id).classList.remove('open')}
 
@@ -330,23 +354,31 @@ function showPage(p,btn){
 }
 
 async function cargarStats(){
-  try{const r=await fetch(API+'/admin/stats');const d=await r.json();
-  document.getElementById('s-total').textContent=d.total_usuarios;
-  document.getElementById('s-activos').textContent=d.usuarios_activos;
-  document.getElementById('s-online').textContent=d.online_ahora;
-  document.getElementById('s-expirados').textContent=d.usuarios_expirados;
-  document.getElementById('s-ingresos').textContent='$'+(d.ingresos_mes||0).toLocaleString('es-CO');}catch(e){}
-  try{const r2=await fetch(API+'/admin/resumen-pagos');const d2=await r2.json();
-  const labels=Object.keys(d2.por_mes).map(k=>{const[y,m]=k.split('-');return new Date(y,m-1).toLocaleString('es-CO',{month:'short'})});
-  const values=Object.values(d2.por_mes);
-  const ctx=document.getElementById('chart-ingresos').getContext('2d');
-  if(chartInst)chartInst.destroy();
-  chartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(59,130,246,.7)',borderRadius:8,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}},y:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}}}}});}catch(e){}
+  try{
+    const r = await authFetch(API+'/admin/stats');
+    if(!r) return;
+    const d = await r.json();
+    document.getElementById('s-total').textContent=d.total_usuarios;
+    document.getElementById('s-activos').textContent=d.usuarios_activos;
+    document.getElementById('s-online').textContent=d.online_ahora;
+    document.getElementById('s-expirados').textContent=d.usuarios_expirados;
+    document.getElementById('s-ingresos').textContent='$'+(d.ingresos_mes||0).toLocaleString('es-CO');
+  }catch(e){}
+  try{
+    const r2 = await authFetch(API+'/admin/resumen-pagos');
+    if(!r2) return;
+    const d2 = await r2.json();
+    const labels=Object.keys(d2.por_mes).map(k=>{const[y,m]=k.split('-');return new Date(y,m-1).toLocaleString('es-CO',{month:'short'})});
+    const values=Object.values(d2.por_mes);
+    const ctx=document.getElementById('chart-ingresos').getContext('2d');
+    if(chartInst)chartInst.destroy();
+    chartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(59,130,246,.7)',borderRadius:8,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}},y:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}}}}});
+  }catch(e){}
 }
 
 async function cargarUsuarios(){
   const tbody=document.getElementById('tabla-usuarios');
-  try{const r=await fetch(API+'/admin/usuarios');const users=await r.json();
+  try{const r=await authFetch(API+'/admin/usuarios');const users=await r.json();
   if(!users.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Sin usuarios</td></tr>';return;}
   tbody.innerHTML=users.map(u=>{
     const estado=!u.activo?'<span class="badge badge-red">Suspendido</span>':u.expira_en_dias<=0?'<span class="badge badge-yellow">Expirado</span>':u.expira_en_dias<=5?'<span class="badge badge-yellow">⚠️ Vence</span>':'<span class="badge badge-green">● Activo</span>';
@@ -357,7 +389,7 @@ async function cargarUsuarios(){
 async function crearUsuario(){
   const usuario=document.getElementById('nu-usuario').value.trim();
   if(!usuario){alert('Escribe un nombre de usuario');return;}
-  const r=await fetch(API+'/admin/usuarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario,paquete:document.getElementById('nu-paquete').value,dias:document.getElementById('nu-dias').value,notas:document.getElementById('nu-notas').value})});
+  const r=await authFetch(API+'/admin/usuarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario,paquete:document.getElementById('nu-paquete').value,dias:document.getElementById('nu-dias').value,notas:document.getElementById('nu-notas').value})});
   const d=await r.json();
   if(!r.ok){alert(d.error||'Error al crear');return;}
   lastCreds=d;mostrarCreds(d,'✅ Usuario creado');
@@ -384,15 +416,15 @@ function copiarCreds(){
 async function verMacs(uid,nombre){
   document.getElementById('macs-nombre').textContent=nombre;
   document.getElementById('modal-macs').classList.add('open');
-  const r=await fetch(API+`/admin/usuarios/${uid}/macs`);const macs=await r.json();
+  const r=await authFetch(API+`/admin/usuarios/${uid}/macs`);const macs=await r.json();
   const lista=document.getElementById('lista-macs');
   lista.innerHTML=macs.length?macs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg);border-radius:10px;margin-bottom:8px"><div><div style="font-size:13px;font-weight:600">${m.nombre}</div><div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">${m.mac}</div></div><button class="btn btn-danger btn-sm" onclick="revocarMac(${m.id})">✕</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Sin dispositivos</p>';
 }
-async function revocarMac(mid){if(!confirm('¿Revocar?'))return;await fetch(API+`/admin/macs/${mid}`,{method:'DELETE'});cerrarModal('modal-macs');}
+async function revocarMac(mid){if(!confirm('¿Revocar?'))return;await authFetch(API+`/admin/macs/${mid}`,{method:'DELETE'});cerrarModal('modal-macs');}
 
 async function verPagos(uid,nombre){pagoUsuarioId=uid;document.getElementById('pagos-nombre').textContent=nombre;document.getElementById('modal-pagos').classList.add('open');await recargarPagos();}
 async function recargarPagos(){
-  const r=await fetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`);const pagos=await r.json();
+  const r=await authFetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`);const pagos=await r.json();
   const lista=document.getElementById('lista-pagos');
   if(!pagos.length){lista.innerHTML='<p style="color:var(--muted);font-size:13px">Sin pagos</p>';return;}
   const total=pagos.reduce((s,p)=>s+p.monto,0);
@@ -401,15 +433,15 @@ async function recargarPagos(){
 async function registrarPago(){
   const monto=parseFloat(document.getElementById('pago-monto').value);
   if(!monto||monto<=0){alert('Monto inválido');return;}
-  await fetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monto,metodo:document.getElementById('pago-metodo').value,notas:document.getElementById('pago-notas').value})});
+  await authFetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monto,metodo:document.getElementById('pago-metodo').value,notas:document.getElementById('pago-notas').value})});
   document.getElementById('pago-monto').value='';document.getElementById('pago-notas').value='';
   await recargarPagos();cargarStats();
 }
-async function eliminarPago(pid){if(!confirm('¿Eliminar?'))return;await fetch(API+`/admin/pagos/${pid}`,{method:'DELETE'});await recargarPagos();cargarStats();}
+async function eliminarPago(pid){if(!confirm('¿Eliminar?'))return;await authFetch(API+`/admin/pagos/${pid}`,{method:'DELETE'});await recargarPagos();cargarStats();}
 
 async function cargarLogs(){
   const lista=document.getElementById('lista-logs');
-  try{const r=await fetch(API+'/admin/logs');const logs=await r.json();
+  try{const r=await authFetch(API+'/admin/logs');const logs=await r.json();
   if(!logs.length){lista.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Sin actividad</div>';return;}
   lista.innerHTML=logs.map((l,i)=>`<div class="log-item"><span style="color:var(--muted);font-size:11px;min-width:24px">${i+1}</span><span style="font-weight:600;min-width:90px">${l.usuario}</span><span style="font-family:\'JetBrains Mono\',monospace;color:var(--accent);font-size:12px;flex:1">${l.canal}</span><span style="color:var(--muted);font-size:11px;min-width:110px">${l.ip}</span><span style="color:var(--muted);font-size:11px;min-width:130px;text-align:right">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join('');}catch(e){lista.innerHTML='<div style="padding:32px;text-align:center;color:var(--red)">Error</div>';}
 }
@@ -417,7 +449,7 @@ async function cargarLogs(){
 async function verLogsUsuario(uid,nombre){
   document.getElementById('logs-user-nombre').textContent=nombre;
   document.getElementById('modal-logs-user').classList.add('open');
-  const r=await fetch(API+`/admin/usuarios/${uid}/logs`);const logs=await r.json();
+  const r=await authFetch(API+`/admin/usuarios/${uid}/logs`);const logs=await r.json();
   const lista=document.getElementById('lista-logs-user');
   lista.innerHTML=logs.length?logs.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--accent);font-size:12px">${l.canal}</span><span style="color:var(--muted);font-size:11px">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Sin actividad</p>';
 }
@@ -426,11 +458,11 @@ async function cargarCRM(){
   const cont=document.getElementById('crm-container');
   cont.innerHTML='<div style="color:var(--muted);grid-column:1/-1">Cargando...</div>';
   try{
-    const[rU,rL]=await Promise.all([fetch(API+'/admin/usuarios'),fetch(API+'/admin/logs')]);
+    const[rU,rL]=await Promise.all([authFetch(API+'/admin/usuarios'),authFetch(API+'/admin/logs')]);
     const users=await rU.json();const logs=await rL.json();
     const ultimoAcceso={};logs.forEach(l=>{if(!ultimoAcceso[l.usuario])ultimoAcceso[l.usuario]=l.fecha;});
     const pagosUser={};
-    await Promise.all(users.map(async u=>{const r=await fetch(API+`/admin/usuarios/${u.id}/pagos`);const p=await r.json();pagosUser[u.id]=p.reduce((s,x)=>s+x.monto,0);}));
+    await Promise.all(users.map(async u=>{const r=await authFetch(API+`/admin/usuarios/${u.id}/pagos`);const p=await r.json();pagosUser[u.id]=p.reduce((s,x)=>s+x.monto,0);}));
     cont.innerHTML=users.map(u=>{
       const estado=!u.activo?'<span class="badge badge-red">Suspendido</span>':u.expira_en_dias<=0?'<span class="badge badge-yellow">Expirado</span>':u.expira_en_dias<=5?'<span class="badge badge-yellow">⚠️ Por vencer</span>':'<span class="badge badge-green">● Activo</span>';
       const ultimo=ultimoAcceso[u.usuario]?new Date(ultimoAcceso[u.usuario]).toLocaleDateString('es-CO'):'Sin actividad';
@@ -440,14 +472,14 @@ async function cargarCRM(){
     }).join('');}catch(e){cont.innerHTML='<div style="color:var(--red)">Error al cargar</div>';}
 }
 
-async function renovar(uid){const dias=prompt('¿Días a agregar?','30');if(!dias)return;const r=await fetch(API+`/admin/usuarios/${uid}/renovar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dias})});const d=await r.json();alert(`✅ Renovado hasta: ${new Date(d.expira).toLocaleDateString('es-CO')}`);cargarUsuarios();}
-async function suspender(uid){await fetch(API+`/admin/usuarios/${uid}/suspender`,{method:'POST'});cargarUsuarios();}
-async function eliminar(uid,nombre){if(!confirm(`¿Eliminar "${nombre}"?`))return;await fetch(API+`/admin/usuarios/${uid}`,{method:'DELETE'});cargarUsuarios();}
-async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${nombre}"?`))return;const r=await fetch(API+`/admin/usuarios/${uid}/reset-password`,{method:'POST'});const d=await r.json();if(!r.ok){alert('Error');return;}lastCreds={...d,paquete:''};mostrarCreds(d,'🔑 Contraseña reseteada');}
+async function renovar(uid){const dias=prompt('¿Días a agregar?','30');if(!dias)return;const r=await authFetch(API+`/admin/usuarios/${uid}/renovar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dias})});const d=await r.json();alert(`✅ Renovado hasta: ${new Date(d.expira).toLocaleDateString('es-CO')}`);cargarUsuarios();}
+async function suspender(uid){await authFetch(API+`/admin/usuarios/${uid}/suspender`,{method:'POST'});cargarUsuarios();}
+async function eliminar(uid,nombre){if(!confirm(`¿Eliminar "${nombre}"?`))return;await authFetch(API+`/admin/usuarios/${uid}`,{method:'DELETE'});cargarUsuarios();}
+async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${nombre}"?`))return;const r=await authFetch(API+`/admin/usuarios/${uid}/reset-password`,{method:'POST'});const d=await r.json();if(!r.ok){alert('Error');return;}lastCreds={...d,paquete:''};mostrarCreds(d,'🔑 Contraseña reseteada');}
 
   async function checkWaStatus() {
     try {
-      const r = await fetch(API + '/admin/wa/status');
+      const r = await authFetch(API+ '/admin/wa/status');
       const d = await r.json();
       const badge = document.getElementById('wa-badge');
       if (d.ready) {
@@ -470,7 +502,7 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
     const res = document.getElementById('wa-notify-result');
     res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
     try {
-      const r = await fetch(API + '/admin/wa/notify-expiring', {
+      const r = await authFetch(API+ '/admin/wa/notify-expiring', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({dias})
       });
@@ -490,7 +522,7 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
     if (!phone || !message) { alert('Completa el número y el mensaje'); return; }
     res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
     try {
-      const r = await fetch(API + '/admin/wa/send', {
+      const r = await authFetch(API+ '/admin/wa/send', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({phone, message})
       });
@@ -510,8 +542,8 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
 
   async function cargarPaquetes() {
     const [rP, rC] = await Promise.all([
-      fetch(API + '/admin/paquetes'),
-      fetch(API + '/admin/categorias-proveedor')
+      authFetch(API+ '/admin/paquetes'),
+      authFetch(API+ '/admin/categorias-proveedor')
     ]);
     const paquetes = await rP.json();
     _categorias = await rC.json();
@@ -567,13 +599,13 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
     const cats = Array.from(checks).map(c => c.value).join(',');
 
     if (_editandoPaquete) {
-      await fetch(API + `/admin/paquetes/${_editandoPaquete.id}`, {
+      await authFetch(API+ `/admin/paquetes/${_editandoPaquete.id}`, {
         method: 'PUT', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({categorias: cats})
       });
     } else {
       const desc = prompt('Descripción del paquete:', '');
-      await fetch(API + '/admin/paquetes', {
+      await authFetch(API+ '/admin/paquetes', {
         method: 'POST', headers: {'Content-Type':'application/json'},
         body: JSON.stringify({nombre: _nuevoPaqueteNombre, descripcion: desc || '', categorias: cats})
       });
@@ -588,8 +620,13 @@ async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${n
 
   async function eliminarPaquete(id, nombre) {
     if (!confirm(`¿Eliminar el paquete "${nombre}"?`)) return;
-    await fetch(API + `/admin/paquetes/${id}`, {method:'DELETE'});
+    await authFetch(API+ `/admin/paquetes/${id}`, {method:'DELETE'});
     await cargarPaquetes();
+  }
+
+  // Verificar autenticación
+  if (!localStorage.getItem('sf_token')) {
+    window.location.href = '/panel/login';
   }
 
   cargarStats();

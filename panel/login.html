@@ -45,18 +45,26 @@
 
     if (!usuario || !password) { err.textContent = 'Completa todos los campos'; err.style.display = 'block'; return; }
 
-    const r = await fetch('/panel/login', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({usuario, password})
-    });
+    try {
+      const r = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({username: usuario, password})
+      });
 
-    if (r.ok) {
-      window.location.href = '/panel/';
-    } else {
-      err.textContent = 'Usuario o contraseña incorrectos';
+      if (r.ok) {
+        const data = await r.json();
+        localStorage.setItem('sf_token', data.token);
+        localStorage.setItem('sf_user', data.user);
+        window.location.href = '/panel/';
+      } else {
+        err.textContent = 'Usuario o contraseña incorrectos';
+        err.style.display = 'block';
+        document.getElementById('password').value = '';
+      }
+    } catch (e) {
+      err.textContent = 'Error de conexión';
       err.style.display = 'block';
-      document.getElementById('password').value = '';
     }
   }
 </script>
