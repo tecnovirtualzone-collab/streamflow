@@ -703,28 +703,60 @@ def live_stream_hls(usuario, contrasena, canal):
         relay.ready_event.wait(timeout=15)
     
     if not relay or not relay.ready:
-        # Fallback: proxy directo al proveedor
-        logger.warning(f"VLC no listo para {canal_id}, usando fallback directo")
+        # Fallback: usar relay HLS con FFmpeg (NO directo al proveedor)
+        # El relay HLS garantiza 1 conexión al proveedor compartida entre todos los usuarios
+        logger.warning(f"VLC no listo para {canal_id}, usando fallback HLS relay (FFmpeg)")
         base, user, pwd = get_proveedor_info()
         url_proveedor = f"{base}/live/{user}/{pwd}/{canal_id}.ts"
-        try:
-            resp = requests.get(url_proveedor, stream=True, timeout=15,
-                                headers={"User-Agent": "VLC/3.0.18"})
-            def gen_fallback():
-                try:
-                    for chunk in resp.iter_content(chunk_size=65536):
-                        if chunk:
-                            yield chunk
-                except:
-                    pass
-                finally:
-                    vlc_manager.remove_viewer(canal_id)
-            return Response(gen_fallback(),
-                            content_type="video/mp2t",
-                            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
-        except:
-            vlc_manager.remove_viewer(canal_id)
-            return jsonify({"error": "Error al conectar"}), 502
+
+        # Enviar a start_relay HLS (FFmpeg) en vez de proxy directo
+        # Esto mantiene la propiedad de 1 conexión por canal
+        if start_relay(canal_id):
+            # Esperar a que el relay HLS genere segmentos
+            info = _relays.get(canal_id)
+            if info:
+                for _ in range(30):
+                    if os.path.exists(info["playlist"]) and os.path.getsize(info["playlist"]) > 0:
+                        break
+                    time.sleep(0.5)
+
+                def gen_hls_fallback():
+                    try:
+                        last_seg = ""
+                        timeout_counter = 0
+                        while timeout_counter < 300:  # 5 min max
+                            with _relay_lock:
+                                ch_info = _relays.get(canal_id)
+                                if not ch_info or ch_info["proc"].poll() is not None:
+                                    break
+                                playlist_path = ch_info["playlist"]
+
+                            if os.path.exists(playlist_path):
+                                with open(playlist_path) as f:
+                                    content = f.read()
+                                segs = [l.strip() for l in content.split("\n") if l.strip().endswith(".ts")]
+                                for seg_name in segs:
+                                    seg_path = os.path.join(ch_info["dir"], seg_name)
+                                    if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
+                                        with open(seg_path, "rb") as sf:
+                                            yield sf.read()
+                                time.sleep(1)
+                                continue
+                            timeout_counter += 1
+                            time.sleep(0.5)
+                    except Exception as e:
+                        logger.error(f"Error en fallback HLS canal {canal_id}: {e}")
+                    finally:
+                        stop_relay_viewer(canal_id)
+
+                return Response(gen_hls_fallback(),
+                                content_type="video/mp2t",
+                                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+        # Si todo falla, error 503 (nunca proxy directo)
+        vlc_manager.remove_viewer(canal_id)
+        logger.error(f"Todos los relays fallaron para canal {canal_id}")
+        return jsonify({"error": "Servicio de streaming no disponible"}), 503
     
     # Proxy del stream local de VLC a todos los usuarios
     def generate():
