@@ -1391,5 +1391,479 @@ with app.app_context():
     init_relay_cleanup()
 
 
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+# ════════════════════════════════════════════════════════════════
+# MOVIES Y SERIES API (VOD - Video On Demand)
+# ════════════════════════════════════════════════════════════════
+
+# Cache para películas y series
+_vod_cache = {
+    "movies": {"data": [], "timestamp": 0, "ttl": 600},      # 10 min cache
+    "series": {"data": [], "timestamp": 0, "ttl": 600},
+    "movie_cats": {"data": [], "timestamp": 0, "ttl": 3600},  # 1 hora cache
+    "series_cats": {"data": [], "timestamp": 0, "ttl": 3600},
+}
+
+
+def _fetch_vod_list(tipo="movie"):
+    """Obtiene lista de películas/series del proveedor con cache."""
+    cache = _vod_cache[tipo]
+    now = time.time()
+    if cache["data"] and (now - cache["timestamp"]) < cache["ttl"]:
+        return cache["data"]
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return []
+
+    try:
+        action = f"get_{tipo}_categories"
+        resp = requests.get(
+            f"{base_prov}/player_api.php",
+            params={"username": prov_user, "password": prov_pass, "action": action},
+            timeout=15,
+        )
+        data = resp.json()
+        if isinstance(data, list):
+            cache["data"] = data
+            cache["timestamp"] = now
+            return data
+    except Exception as e:
+        logger.error(f"Error obteniendo {tipo} list: {e}")
+    return cache["data"]
+
+
+def _fetch_vod_info(tipo, vod_id):
+    """Obtiene info detallada de una película/serie."""
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return None
+    try:
+        resp = requests.get(
+            f"{base_prov}/player_api.php",
+            params={
+                "username": prov_user,
+                "password": prov_pass,
+                "action": f"get_{tipo}_info",
+                f"{tipo}_id": vod_id,
+            },
+            timeout=15,
+        )
+        return resp.json()
+    except:
+        return None
+
+
+@app.route("/api/movies/categories", methods=["GET"])
+@admin_required
+def api_movie_categories():
+    """Lista categorías de películas."""
+    cats = _fetch_vod_list("movie")
+    return jsonify(cats)
+
+
+@app.route("/api/movies", methods=["GET"])
+@admin_required
+def api_movies_list():
+    """Lista películas con filtro por categoría."""
+    categoria = request.args.get("category", "")
+    pagina = int(request.args.get("page", 1))
+    limite = int(request.args.get("limit", 50))
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return jsonify({"error": "Proveedor no configurado"}), 502
+
+    try:
+        params = {"username": prov_user, "password": prov_pass, "action": "get_movies"}
+        if categoria:
+            params["category_id"] = categoria
+        resp = requests.get(f"{base_prov}/player_api.php", params=params, timeout=15)
+        movies = resp.json() if isinstance(resp.json(), list) else []
+
+        # Paginación
+        inicio = (pagina - 1) * limite
+        fin = inicio + limite
+        paginado = movies[inicio:fin]
+
+        return jsonify({
+            "total": len(movies),
+            "page": pagina,
+            "limit": limite,
+            "movies": paginado,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/movies/<int:movie_id>", methods=["GET"])
+@admin_required
+def api_movie_detail(movie_id):
+    """Detalle de una película."""
+    info = _fetch_vod_info("movie", movie_id)
+    if info:
+        return jsonify(info)
+    return jsonify({"error": "No encontrada"}), 404
+
+
+@app.route("/api/series/categories", methods=["GET"])
+@admin_required
+def api_series_categories():
+    """Lista categorías de series."""
+    cats = _fetch_vod_list("series")
+    return jsonify(cats)
+
+
+@app.route("/api/series", methods=["GET"])
+@admin_required
+def api_series_list():
+    """Lista series con filtro por categoría."""
+    categoria = request.args.get("category", "")
+    pagina = int(request.args.get("page", 1))
+    limite = int(request.args.get("limit", 50))
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return jsonify({"error": "Proveedor no configurado"}), 502
+
+    try:
+        params = {"username": prov_user, "password": prov_pass, "action": "get_series"}
+        if categoria:
+            params["category_id"] = categoria
+        resp = requests.get(f"{base_prov}/player_api.php", params=params, timeout=15)
+        series = resp.json() if isinstance(resp.json(), list) else []
+
+        inicio = (pagina - 1) * limite
+        fin = inicio + limite
+        paginado = series[inicio:fin]
+
+        return jsonify({
+            "total": len(series),
+            "page": pagina,
+            "limit": limite,
+            "series": paginado,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/api/series/<int:series_id>", methods=["GET"])
+@admin_required
+def api_series_detail(series_id):
+    """Detalle de una serie con sus temporadas y episodios."""
+    info = _fetch_vod_info("series", series_id)
+    if info:
+        return jsonify(info)
+    return jsonify({"error": "No encontrada"}), 404
+
+
+@app.route("/api/vod/search", methods=["GET"])
+@admin_required
+def api_vod_search():
+    """Busca películas y series por nombre."""
+    query = request.args.get("q", "").lower()
+    if not query or len(query) < 2:
+        return jsonify({"movies": [], "series": []})
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return jsonify({"movies": [], "series": []})
+
+    results = {"movies": [], "series": []}
+
+    try:
+        # Buscar películas
+        resp = requests.get(
+            f"{base_prov}/player_api.php",
+            params={"username": prov_user, "password": prov_pass, "action": "get_movies"},
+            timeout=15,
+        )
+        movies = resp.json() if isinstance(resp.json(), list) else []
+        results["movies"] = [
+            m for m in movies
+            if query in m.get("name", "").lower()
+        ][:20]
+
+        # Buscar series
+        resp = requests.get(
+            f"{base_prov}/player_api.php",
+            params={"username": prov_user, "password": prov_pass, "action": "get_series"},
+            timeout=15,
+        )
+        series = resp.json() if isinstance(resp.json(), list) else []
+        results["series"] = [
+            s for s in series
+            if query in s.get("name", "").lower()
+        ][:20]
+    except:
+        pass
+
+    return jsonify(results)
+
+
+# ════════════════════════════════════════════════════════════════
+# VOD STREAMING — Películas y Series con relay
+# ════════════════════════════════════════════════════════════════
+
+# Cache de relays VOD: { movie_id: { proc, viewers, last_view, ready, path, playlist, url } }
+_vod_relays = {}
+_vod_relay_lock = threading.Lock()
+
+
+@app.route("/movie/<usuario>/<contrasena>/<vod_id>")
+def movie_stream(usuario, contrasena, vod_id):
+    """
+    Streaming de películas con relay compartido.
+    Múltiples usuarios viendo la misma película = 1 conexión al proveedor.
+    """
+    mac = request.headers.get("X-MAC-Address", "")
+    ip = request.headers.get("X-Real-IP", request.remote_addr)
+
+    ok, user_obj, resultado = verificar_acceso(usuario, contrasena, mac, ip, f"movie_{vod_id}")
+    if not ok:
+        return jsonify({"error": resultado}), 403
+
+    if user_obj:
+        try:
+            log = LogAcceso(usuario_id=user_obj.id, canal=f"movie_{vod_id}", ip=ip)
+            db.session.add(log)
+            db.session.commit()
+        except:
+            pass
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return jsonify({"error": "Proveedor no configurado"}), 502
+
+    # URL de la película en el proveedor
+    url_proveedor = f"{base_prov}/movie/{prov_user}/{prov_pass}/{vod_id}"
+
+    # Verificar si ya hay un relay activo para esta película
+    with _vod_relay_lock:
+        if vod_id in _vod_relays:
+            relay = _vod_relays[vod_id]
+            if relay["proc"] and relay["proc"].poll() is None:
+                relay["viewers"] += 1
+                relay["last_view"] = time.time()
+                logger.info(f"Película {vod_id}: +1 viewer (total: {relay['viewers']})")
+            else:
+                del _vod_relays[vod_id]
+                relay = None
+        else:
+            relay = None
+
+        if not relay:
+            # Iniciar nuevo relay FFmpeg para esta película
+            vod_hls_dir = os.path.join(HLS_DIR, "movies", str(vod_id))
+            os.makedirs(vod_hls_dir, exist_ok=True)
+            playlist = os.path.join(vod_hls_dir, "index.m3u8")
+
+            # Limpiar segmentos anteriores
+            for f in os.listdir(vod_hls_dir):
+                try:
+                    os.remove(os.path.join(vod_hls_dir, f))
+                except:
+                    pass
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "5",
+                "-user_agent", "VLC/3.0.18 LibVLC/3.0.18",
+                "-i", url_proveedor,
+                "-c", "copy",
+                "-f", "hls",
+                "-hls_time", "6",
+                "-hls_list_size", "0",  # Mantener todos los segmentos (película completa)
+                "-hls_flags", "append_list+delete_segments",
+                "-hls_segment_filename", os.path.join(vod_hls_dir, "seg%05d.ts"),
+                playlist,
+            ]
+
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setsid,
+                )
+                _vod_relays[vod_id] = {
+                    "proc": proc,
+                    "viewers": 1,
+                    "last_view": time.time(),
+                    "ready": False,
+                    "path": vod_hls_dir,
+                    "playlist": playlist,
+                    "url": url_proveedor,
+                }
+                logger.info(f"Relay película {vod_id} iniciado (PID {proc.pid})")
+            except Exception as e:
+                logger.error(f"Error iniciando relay película {vod_id}: {e}")
+                return jsonify({"error": "Error al iniciar stream"}), 502
+
+    # Esperar a que el playlist esté listo
+    for _ in range(30):
+        info = _vod_relays.get(vod_id)
+        if info and os.path.exists(info["playlist"]) and os.path.getsize(info["playlist"]) > 0:
+            break
+        time.sleep(0.5)
+
+    # Servir segmentos HLS
+    def generate():
+        try:
+            while True:
+                with _vod_relay_lock:
+                    info = _vod_relays.get(vod_id)
+                    if not info or (info["proc"] and info["proc"].poll() is not None):
+                        break
+                    playlist_path = info["playlist"]
+
+                if os.path.exists(playlist_path):
+                    with open(playlist_path) as f:
+                        content = f.read()
+                    segs = [l.strip() for l in content.split("\n") if l.strip().endswith(".ts")]
+                    for seg_name in segs:
+                        seg_path = os.path.join(info["path"], seg_name)
+                        if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
+                            with open(seg_path, "rb") as sf:
+                                yield sf.read()
+                time.sleep(1)
+        except Exception as e:
+            logger.error(f"Error streaming película {vod_id}: {e}")
+        finally:
+            with _vod_relay_lock:
+                if vod_id in _vod_relays:
+                    _vod_relays[vod_id]["viewers"] = max(0, _vod_relays[vod_id]["viewers"] - 1)
+
+    return Response(generate(),
+                    content_type="video/mp2t",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@app.route("/series/<usuario>/<contrasena>/<episode_id>")
+def series_stream(usuario, contrasena, episode_id):
+    """
+    Streaming de episodios de series con relay compartido.
+    Misma lógica que películas.
+    """
+    mac = request.headers.get("X-MAC-Address", "")
+    ip = request.headers.get("X-Real-IP", request.remote_addr)
+
+    ok, user_obj, resultado = verificar_acceso(usuario, contrasena, mac, ip, f"series_{episode_id}")
+    if not ok:
+        return jsonify({"error": resultado}), 403
+
+    if user_obj:
+        try:
+            log = LogAcceso(usuario_id=user_obj.id, canal=f"series_{episode_id}", ip=ip)
+            db.session.add(log)
+            db.session.commit()
+        except:
+            pass
+
+    base_prov, prov_user, prov_pass = get_proveedor_info()
+    if not base_prov:
+        return jsonify({"error": "Proveedor no configurado"}), 502
+
+    url_proveedor = f"{base_prov}/series/{prov_user}/{prov_pass}/{episode_id}"
+
+    # Reutilizar la misma lógica de relay que películas
+    with _vod_relay_lock:
+        if episode_id in _vod_relays:
+            relay = _vod_relays[episode_id]
+            if relay["proc"] and relay["proc"].poll() is None:
+                relay["viewers"] += 1
+                relay["last_view"] = time.time()
+            else:
+                del _vod_relays[episode_id]
+                relay = None
+        else:
+            relay = None
+
+        if not relay:
+            vod_hls_dir = os.path.join(HLS_DIR, "series", str(episode_id))
+            os.makedirs(vod_hls_dir, exist_ok=True)
+            playlist = os.path.join(vod_hls_dir, "index.m3u8")
+
+            for f in os.listdir(vod_hls_dir):
+                try:
+                    os.remove(os.path.join(vod_hls_dir, f))
+                except:
+                    pass
+
+            cmd = [
+                "ffmpeg", "-y",
+                "-reconnect", "1",
+                "-reconnect_streamed", "1",
+                "-reconnect_delay_max", "5",
+                "-user_agent", "VLC/3.0.18 LibVLC/3.0.18",
+                "-i", url_proveedor,
+                "-c", "copy",
+                "-f", "hls",
+                "-hls_time", "6",
+                "-hls_list_size", "0",
+                "-hls_flags", "append_list+delete_segments",
+                "-hls_segment_filename", os.path.join(vod_hls_dir, "seg%05d.ts"),
+                playlist,
+            ]
+
+            try:
+                proc = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    preexec_fn=os.setsid,
+                )
+                _vod_relays[episode_id] = {
+                    "proc": proc,
+                    "viewers": 1,
+                    "last_view": time.time(),
+                    "ready": False,
+                    "path": vod_hls_dir,
+                    "playlist": playlist,
+                    "url": url_proveedor,
+                }
+            except Exception as e:
+                logger.error(f"Error iniciando relay serie {episode_id}: {e}")
+                return jsonify({"error": "Error al iniciar stream"}), 502
+
+    for _ in range(30):
+        info = _vod_relays.get(episode_id)
+        if info and os.path.exists(info["playlist"]) and os.path.getsize(info["playlist"]) > 0:
+            break
+        time.sleep(0.5)
+
+    def generate():
+        try:
+            while True:
+                with _vod_relay_lock:
+                    info = _vod_relays.get(episode_id)
+                    if not info or (info["proc"] and info["proc"].poll() is not None):
+                        break
+                    playlist_path = info["playlist"]
+
+                if os.path.exists(playlist_path):
+                    with open(playlist_path) as f:
+                        content = f.read()
+                    segs = [l.strip() for l in content.split("\n") if l.strip().endswith(".ts")]
+                    for seg_name in segs:
+                        seg_path = os.path.join(info["path"], seg_name)
+                        if os.path.exists(seg_path) and os.path.getsize(seg_path) > 0:
+                            with open(seg_path, "rb") as sf:
+                                yield sf.read()
+                time.sleep(1)
+        except Exception as e:
+            logger.error(f"Error streaming serie {episode_id}: {e}")
+        finally:
+            with _vod_relay_lock:
+                if episode_id in _vod_relays:
+                    _vod_relays[episode_id]["viewers"] = max(0, _vod_relays[episode_id]["viewers"] - 1)
+
+    return Response(generate(),
+                    content_type="video/mp2t",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+# ════════════════════════════════════════════════════════════════
+# INICIALIZACIÓN
+# ════════════════════════════════════════════════════════════════
