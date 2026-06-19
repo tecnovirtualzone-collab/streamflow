@@ -94,9 +94,19 @@ app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
-# Proveedor IPTV
+# Proveedor IPTV (cuentas premium)
 URL_M3U_PROVEEDOR = os.environ.get("URL_M3U", "")
 WA_SERVICE_URL = os.environ.get("WA_SERVICE_URL", "http://localhost:3001")
+
+# Listas gratuitas para canales de relleno
+# Formato: lista de URLs M3U públicas
+FREE_M3U_LISTS = os.environ.get("FREE_M3U_LISTS", "").split(",") if os.environ.get("FREE_M3U_LISTS") else [
+    "https://iptv-org.github.io/iptv/index.m3u8",
+]
+
+# Canales premium (los que vienen del proveedor de pago)
+# Se configuran automáticamente desde la lista M3U del proveedor
+PREMIUM_CHANNELS_FILE = os.environ.get("PREMIUM_CHANNELS_FILE", "/tmp/premium_channels.json")
 
 # Logging
 logging.basicConfig(
@@ -1559,6 +1569,428 @@ with app.app_context():
         db.session.commit()
         logger.info("Paquetes por defecto creados")
     init_relay_cleanup()
+
+
+# ════════════════════════════════════════════════════════════════
+# GESTIÓN DE CANALES POR PANEL ADMIN
+# ════════════════════════════════════════════════════════════════
+# Sistema para que el admin pueda:
+# 1. Ver todos los canales (proveedor + listas gratuitas)
+# 2. Crear/editar listas de canales por plan
+# 3. Asignar canales a planes (Básico, Estándar, Premium)
+# 4. Mezclar canales premium + relleno en cada lista
+
+# Cache de canales parseados de todas las fuentes
+_all_channels_cache = {
+    "proveedor": [],      # Canales del proveedor premium
+    "gratuitos": [],      # Canales de listas gratuitas
+    "timestamp": 0,
+    "ttl": 300,           # 5 minutos de cache
+}
+
+# Listas personalizadas por plan: { plan_nombre: [canal_id, ...] }
+_custom_lists = {}
+_custom_lists_lock = threading.Lock()
+
+
+def _parse_m3u(content):
+    """Parsea contenido M3U y retorna lista de canales."""
+    import re
+    channels = []
+    current = {}
+    for line in content.split("\n"):
+        line = line.strip()
+        if line.startswith("#EXTINF:"):
+            current = {"info": line}
+            name_match = re.search(r'tvg-name="([^"]*)"', line)
+            id_match = re.search(r'tvg-id="([^"]*)"', line)
+            group_match = re.search(r'group-title="([^"]*)"', line)
+            logo_match = re.search(r'tvg-logo="([^"]*)"', line)
+            current["name"] = name_match.group(1) if name_match else ""
+            current["tvg_id"] = id_match.group(1) if id_match else ""
+            current["group"] = group_match.group(1) if group_match else ""
+            current["logo"] = logo_match.group(1) if logo_match else ""
+            # Nombre después de la última coma
+            if "," in line:
+                current["display_name"] = line.rsplit(",", 1)[-1].strip()
+            else:
+                current["display_name"] = current["name"]
+        elif line.startswith("http") and current:
+            current["url"] = line
+            channels.append(current)
+            current = {}
+    return channels
+
+
+def _load_all_channels():
+    """Carga canales de todas las fuentes (proveedor + listas gratuitas)."""
+    now = time.time()
+    if (_all_channels_cache["proveedor"] or _all_channels_cache["gratuitos"]) and \
+       (now - _all_channels_cache["timestamp"]) < _all_channels_cache["ttl"]:
+        return
+
+    # Canales del proveedor premium
+    try:
+        m3u_content = get_m3u_list()
+        if m3u_content:
+            _all_channels_cache["proveedor"] = _parse_m3u(m3u_content)
+            logger.info(f"Canales proveedor: {len(_all_channels_cache['proveedor'])}")
+    except Exception as e:
+        logger.error(f"Error cargando canales proveedor: {e}")
+
+    # Canales gratuitos
+    free_channels = []
+    for url in FREE_M3U_LISTS:
+        url = url.strip()
+        if not url:
+            continue
+        try:
+            resp = requests.get(url, timeout=30)
+            if resp.status_code == 200:
+                parsed = _parse_m3u(resp.text)
+                for ch in parsed:
+                    ch["source"] = "free"
+                    ch["source_url"] = url
+                free_channels.extend(parsed)
+                logger.info(f"Canales gratuitos de {url[:50]}: {len(parsed)}")
+        except Exception as e:
+            logger.error(f"Error cargando lista gratuita {url[:50]}: {e}")
+
+    _all_channels_cache["gratuitos"] = free_channels
+    _all_channels_cache["timestamp"] = now
+
+
+def _get_channel_unique_id(channel):
+    """Genera un ID único para un canal."""
+    name = channel.get("name", "") or channel.get("display_name", "")
+    url = channel.get("url", "")
+    return f"{name}_{hashlib.md5(url.encode()).hexdigest()[:8]}"
+
+
+# ── APIs de gestión de canales ──
+
+@app.route("/admin/channels/all", methods=["GET"])
+@admin_required
+def admin_all_channels():
+    """
+    Retorna todos los canales disponibles de todas las fuentes.
+    Query params:
+        source: 'proveedor' | 'gratuitos' | 'all'
+        search: texto a buscar
+        group: filtrar por grupo/categoría
+        page: número de página
+        limit: resultados por página
+    """
+    _load_all_channels()
+
+    source = request.args.get("source", "all")
+    search = request.args.get("search", "").lower()
+    group = request.args.get("group", "")
+    page = int(request.args.get("page", 1))
+    limit = min(int(request.args.get("limit", 100)), 500)
+
+    # Combinar canales según fuente
+    if source == "proveedor":
+        channels = _all_channels_cache["proveedor"]
+    elif source == "gratuitos":
+        channels = _all_channels_cache["gratuitos"]
+    else:
+        # Combinar ambos, marcando si es premium
+        channels = []
+        seen_urls = set()
+        for ch in _all_channels_cache["proveedor"]:
+            ch["is_premium"] = True
+            ch["unique_id"] = _get_channel_unique_id(ch)
+            channels.append(ch)
+            seen_urls.add(ch.get("url", ""))
+
+        for ch in _all_channels_cache["gratuitos"]:
+            ch["is_premium"] = False
+            ch["unique_id"] = _get_channel_unique_id(ch)
+            if ch.get("url", "") not in seen_urls:
+                channels.append(ch)
+                seen_urls.add(ch.get("url", ""))
+
+    # Filtros
+    if search:
+        channels = [
+            ch for ch in channels
+            if search in (ch.get("name", "") or "").lower()
+            or search in (ch.get("display_name", "") or "").lower()
+            or search in (ch.get("tvg_id", "") or "").lower()
+        ]
+    if group:
+        channels = [
+            ch for ch in channels
+            if group.lower() in (ch.get("group", "") or "").lower()
+        ]
+
+    total = len(channels)
+    inicio = (page - 1) * limit
+    fin = inicio + limit
+
+    # Grupos disponibles
+    grupos = list(set(
+        ch.get("group", "Sin categoría") or "Sin categoría"
+        for ch in channels
+    ))
+
+    return jsonify({
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "pages": (total + limit - 1) // limit,
+        "groups": sorted(grupos),
+        "premium_count": len(_all_channels_cache["proveedor"]),
+        "free_count": len(_all_channels_cache["gratuitos"]),
+        "channels": channels[inicio:fin],
+    })
+
+
+@app.route("/admin/channels/refresh", methods=["POST"])
+@admin_required
+def admin_refresh_channels():
+    """Fuerza la recarga de canales de todas las fuentes."""
+    _all_channels_cache["timestamp"] = 0
+    _load_all_channels()
+    return jsonify({
+        "ok": True,
+        "premium_count": len(_all_channels_cache["proveedor"]),
+        "free_count": len(_all_channels_cache["gratuitos"]),
+    })
+
+
+# ── APIs de listas por plan ──
+
+@app.route("/admin/lists", methods=["GET"])
+@admin_required
+def admin_get_lists():
+    """Obtiene todas las listas de canales por plan."""
+    with _custom_lists_lock:
+        return jsonify(_custom_lists)
+
+
+@app.route("/admin/lists/<plan>", methods=["GET"])
+@admin_required
+def admin_get_list(plan):
+    """Obtiene la lista de canales de un plan específico."""
+    with _custom_lists_lock:
+        lista = _custom_lists.get(plan, [])
+
+    # Enriquecer con datos de los canales
+    _load_all_channels()
+    enriched = []
+    all_ch = {ch.get("unique_id", ""): ch for ch in _all_channels_cache["proveedor"]}
+    all_ch.update({ch.get("unique_id", ""): ch for ch in _all_channels_cache["gratuitos"]})
+
+    for item in lista:
+        ch_data = all_ch.get(item.get("channel_id", {}), {})
+        enriched.append({
+            **item,
+            "channel_name": ch_data.get("display_name", ch_data.get("name", "?")),
+            "channel_group": ch_data.get("group", ""),
+            "is_premium": ch_data.get("is_premium", False),
+        })
+
+    return jsonify({"plan": plan, "channels": enriched, "total": len(enriched)})
+
+
+@app.route("/admin/lists/<plan>", methods=["POST"])
+@admin_required
+def admin_save_list(plan):
+    """
+    Guarda la lista de canales para un plan.
+    Body: { channels: [ { channel_id, name, order }, ... ] }
+    """
+    data = request.json or {}
+    channels_list = data.get("channels", [])
+
+    with _custom_lists_lock:
+        _custom_lists[plan] = channels_list
+
+    logger.info(f"Lista de plan '{plan}' actualizada: {len(channels_list)} canales")
+    return jsonify({"ok": True, "total": len(channels_list)})
+
+
+@app.route("/admin/lists/<plan>/add", methods=["POST"])
+@admin_required
+def admin_add_channel_to_plan(plan):
+    """Agrega un canal a la lista de un plan."""
+    data = request.json or {}
+    channel_id = data.get("channel_id")
+    channel_name = data.get("channel_name", "")
+    is_premium = data.get("is_premium", False)
+
+    if not channel_id:
+        return jsonify({"error": "channel_id requerido"}), 400
+
+    with _custom_lists_lock:
+        if plan not in _custom_lists:
+            _custom_lists[plan] = []
+
+        # Verificar si ya existe
+        existing = [ch for ch in _custom_lists[plan] if ch.get("channel_id") == channel_id]
+        if existing:
+            return jsonify({"error": "El canal ya está en la lista"}), 409
+
+        _custom_lists[plan].append({
+            "channel_id": channel_id,
+            "name": channel_name,
+            "is_premium": is_premium,
+            "order": len(_custom_lists[plan]) + 1,
+            "added_at": datetime.utcnow().isoformat(),
+        })
+
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/lists/<plan>/remove", methods=["POST"])
+@admin_required
+def admin_remove_channel_from_plan(plan):
+    """Remueve un canal de la lista de un plan."""
+    data = request.json or {}
+    channel_id = data.get("channel_id")
+
+    if not channel_id:
+        return jsonify({"error": "channel_id requerido"}), 400
+
+    with _custom_lists_lock:
+        if plan in _custom_lists:
+            _custom_lists[plan] = [
+                ch for ch in _custom_lists[plan]
+                if ch.get("channel_id") != channel_id
+            ]
+
+    return jsonify({"ok": True})
+
+
+@app.route("/admin/lists/<plan>/reorder", methods=["POST"])
+@admin_required
+def admin_reorder_list(plan):
+    """Reordena los canales de un plan."""
+    data = request.json or {}
+    ordered_ids = data.get("channel_ids", [])
+
+    with _custom_lists_lock:
+        if plan not in _custom_lists:
+            _custom_lists[plan] = []
+
+        # Reordenar según la lista de IDs
+        ordered = []
+        for i, ch_id in enumerate(ordered_ids):
+            for ch in _custom_lists[plan]:
+                if ch.get("channel_id") == ch_id:
+                    ch["order"] = i + 1
+                    ordered.append(ch)
+                    break
+        _custom_lists[plan] = ordered
+
+    return jsonify({"ok": True})
+
+
+# ── Generador de M3U por plan ──
+
+@app.route("/m3u/<plan>")
+def m3u_by_plan(plan):
+    """
+    Genera lista M3U personalizada para un plan.
+    Requiere auth de usuario.
+    """
+    usuario = request.args.get("username", "")
+    contrasena = request.args.get("password", "")
+
+    user, error = autenticar(usuario, contrasena)
+    if not user:
+        return "Acceso denegado", 403
+
+    # Verificar que el usuario tiene el plan correcto
+    if user.paquete != plan:
+        return "Plan no autorizado", 403
+
+    with _custom_lists_lock:
+        lista = _custom_lists.get(plan, [])
+
+    if not lista:
+        return "#EXTM3U\n# No hay canales configurados para este plan", 200
+
+    # Generar M3U
+    m3u_lines = ["#EXTM3U"]
+    _load_all_channels()
+
+    all_ch = {}
+    for ch in _all_channels_cache["proveedor"]:
+        uid = _get_channel_unique_id(ch)
+        all_ch[uid] = ch
+        ch["_source"] = "proveedor"
+    for ch in _all_channels_cache["gratuitos"]:
+        uid = _get_channel_unique_id(ch)
+        if uid not in all_ch:
+            all_ch[uid] = ch
+            ch["_source"] = "free"
+
+    host = request.host_url.rstrip("/")
+
+    for item in sorted(lista, key=lambda x: x.get("order", 999)):
+        ch_data = all_ch.get(item.get("channel_id", ""), {})
+        name = ch_data.get("display_name") or ch_data.get("name", "") or item.get("name", "")
+        url = ch_data.get("url", "")
+
+        if url:
+            # Reescribir URL para pasar por nuestro proxy
+            if ch_data.get("_source") == "proveedor":
+                # Canal premium → pasa por Smart Relay
+                proxy_url = f"{host}/live/{usuario}/{contrasena}/{item.get('channel_id', '')}"
+            else:
+                # Canal gratuito → proxy directo o relay local
+                proxy_url = f"{host}/relay/{item.get('channel_id', '')}"
+
+            group = ch_data.get("group", plan)
+            logo = ch_data.get("logo", "")
+            tvg_id = ch_data.get("tvg_id", "")
+
+            extinf = f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-logo="{logo}" group-title="{group}"'
+            if ch_data.get("_source") == "proveedor":
+                extinf += ' premium="true"'
+            extinf += f",{name}"
+
+            m3u_lines.append(extinf)
+            m3u_lines.append(proxy_url)
+
+    return Response("\n".join(m3u_lines), content_type="application/x-mpegURL")
+
+
+# Proxy para canales gratuitos (relleno)
+_free_relays = {}
+_free_relays_lock = threading.Lock()
+
+
+@app.route("/relay/<channel_id>")
+def relay_free_channel(channel_id):
+    """
+    Proxy para canales gratuitos (de relleno).
+    Estos no pasan por el proveedor premium.
+    Sirve el stream directo con un relay HLS local.
+    """
+    with _free_relays_lock:
+        relay = _free_relays.get(channel_id)
+        if relay and relay.get("url"):
+            url = relay["url"]
+        else:
+            return jsonify({"error": "Canal no encontrado"}), 404
+
+    def generate():
+        try:
+            resp = requests.get(url, stream=True, timeout=30,
+                                headers={"User-Agent": "VLC/3.0.18 LibVLC/3.0.18"})
+            for chunk in resp.iter_content(chunk_size=65536):
+                if chunk:
+                    yield chunk
+        except Exception as e:
+            logger.error(f"Error en relay canal gratuito {channel_id}: {e}")
+
+    return Response(generate(),
+                    content_type="video/mp2t",
+                    headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
 # ════════════════════════════════════════════════════════════════
