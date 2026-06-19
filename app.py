@@ -1666,247 +1666,374 @@ with app.app_context():
 # ════════════════════════════════════════════════════════════════
 # APIs DE GESTIÓN DE CANALES (Panel Admin)
 # ════════════════════════════════════════════════════════════════
-# Sistema para que el admin pueda:
-# 1. Ver todos los canales (proveedor + listas gratuitas)
-# 2. Crear/editar listas de canales por plan
-# 3. Asignar canales a planes (Básico, Estándar, Premium)
-# 4. Mezclar canales premium + relleno en cada lista
 
-# Cache de canales parseados de todas las fuentes
-_all_channels_cache = {
-    "proveedor": [],      # Canales del proveedor premium
-    "gratuitos": [],      # Canales de listas gratuitas
-    "timestamp": 0,
-    "ttl": 300,           # 5 minutos de cache
-}
-
-# Listas personalizadas por plan: { plan_nombre: [canal_id, ...] }
-_custom_lists = {}
-_custom_lists_lock = threading.Lock()
+def _get_channel_manager():
+    """Obtiene la instancia del channel manager."""
+    from channel_manager import channel_manager
+    return channel_manager
 
 
-def _parse_m3u(content):
-    """Parsea contenido M3U y retorna lista de canales."""
-    import re
-    channels = []
-    current = {}
-    for line in content.split("\n"):
-        line = line.strip()
-        if line.startswith("#EXTINF:"):
-            current = {"info": line}
-            name_match = re.search(r'tvg-name="([^"]*)"', line)
-            id_match = re.search(r'tvg-id="([^"]*)"', line)
-            group_match = re.search(r'group-title="([^"]*)"', line)
-            logo_match = re.search(r'tvg-logo="([^"]*)"', line)
-            current["name"] = name_match.group(1) if name_match else ""
-            current["tvg_id"] = id_match.group(1) if id_match else ""
-            current["group"] = group_match.group(1) if group_match else ""
-            current["logo"] = logo_match.group(1) if logo_match else ""
-            # Nombre después de la última coma
-            if "," in line:
-                current["display_name"] = line.rsplit(",", 1)[-1].strip()
-            else:
-                current["display_name"] = current["name"]
-        elif line.startswith("http") and current:
-            current["url"] = line
-            channels.append(current)
-            current = {}
-    return channels
+# ── Carga de canales ──
 
-
-def _load_all_channels():
-    """Carga canales de todas las fuentes (proveedor + listas gratuitas)."""
-    now = time.time()
-    if (_all_channels_cache["proveedor"] or _all_channels_cache["gratuitos"]) and \
-       (now - _all_channels_cache["timestamp"]) < _all_channels_cache["ttl"]:
-        return
-
-    # Canales del proveedor premium
-    try:
-        m3u_content = get_m3u_list()
-        if m3u_content:
-            _all_channels_cache["proveedor"] = _parse_m3u(m3u_content)
-            logger.info(f"Canales proveedor: {len(_all_channels_cache['proveedor'])}")
-    except Exception as e:
-        logger.error(f"Error cargando canales proveedor: {e}")
-
-    # Canales gratuitos
-    free_channels = []
-    for url in FREE_M3U_LISTS:
-        url = url.strip()
-        if not url:
-            continue
-        try:
-            resp = requests.get(url, timeout=30)
-            if resp.status_code == 200:
-                parsed = _parse_m3u(resp.text)
-                for ch in parsed:
-                    ch["source"] = "free"
-                    ch["source_url"] = url
-                free_channels.extend(parsed)
-                logger.info(f"Canales gratuitos de {url[:50]}: {len(parsed)}")
-        except Exception as e:
-            logger.error(f"Error cargando lista gratuita {url[:50]}: {e}")
-
-    _all_channels_cache["gratuitos"] = free_channels
-    _all_channels_cache["timestamp"] = now
-
-
-def _get_channel_unique_id(channel):
-    """Genera un ID único para un canal."""
-    name = channel.get("name", "") or channel.get("display_name", "")
-    url = channel.get("url", "")
-    return f"{name}_{hashlib.md5(url.encode()).hexdigest()[:8]}"
-
-
-# ── APIs de gestión de canales ──
-
-@app.route("/admin/channels/all", methods=["GET"])
+@app.route("/admin/channels/load-provider", methods=["POST"])
 @admin_required
-def admin_all_channels():
+def admin_load_provider():
     """
-    Retorna todos los canales disponibles de todas las fuentes.
-    Query params:
-        source: 'proveedor' | 'gratuitos' | 'all'
-        search: texto a buscar
-        group: filtrar por grupo/categoría
-        page: número de página
-        limit: resultados por página
+    Carga canales desde un proveedor (URL M3U).
+    Body: { url: "http://proveedor.com/get.php?...", nombre: "Proveedor1" }
     """
-    _load_all_channels()
+    data = request.json or {}
+    url = data.get("url", "").strip()
+    nombre = data.get("nombre", "proveedor").strip()
 
-    source = request.args.get("source", "all")
+    if not url:
+        return jsonify({"error": "URL requerida"}), 400
+
+    try:
+        resp = requests.get(url, timeout=60)
+        if resp.status_code != 200:
+            return jsonify({"error": f"HTTP {resp.status_code}"}), 502
+
+        cm = _get_channel_manager()
+        nuevos, vinculados, total = cm.load_from_proveedor(nombre, resp.text)
+
+        return jsonify({
+            "ok": True,
+            "proveedor": nombre,
+            "nuevos": nuevos,
+            "vinculados": vinculados,
+            "total": total,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/admin/channels/change-provider", methods=["POST"])
+@admin_required
+def admin_change_provider():
+    """
+    Cambia de proveedor. Desactiva el anterior y carga el nuevo.
+    Body: {
+        proveedor_anterior: "Proveedor1",
+        proveedor_nuevo: "Proveedor2",
+        url_nueva: "http://nuevo.com/get.php?..."
+    }
+    """
+    data = request.json or {}
+    prov_anterior = data.get("proveedor_anterior", "").strip()
+    prov_nuevo = data.get("proveedor_nuevo", "").strip()
+    url_nueva = data.get("url_nueva", "").strip()
+
+    if not prov_nuevo or not url_nueva:
+        return jsonify({"error": "proveedor_nuevo y url_nueva requeridos"}), 400
+
+    try:
+        resp = requests.get(url_nueva, timeout=60)
+        if resp.status_code != 200:
+            return jsonify({"error": f"HTTP {resp.status_code}"}), 502
+
+        cm = _get_channel_manager()
+        desactivadas, nuevos, vinculados, sin_fuente = cm.cambiar_proveedor(
+            prov_anterior, prov_nuevo, resp.text
+        )
+
+        return jsonify({
+            "ok": True,
+            "proveedor_anterior": prov_anterior,
+            "proveedor_nuevo": prov_nuevo,
+            "fuentes_desactivadas": desactivadas,
+            "canales_nuevos": nuevos,
+            "canales_vinculados": vinculados,
+            "canales_sin_fuente": sin_fuente,
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/admin/channels/load-free", methods=["POST"])
+@admin_required
+def admin_load_free():
+    """
+    Carga canales desde listas gratuitas como backup.
+    Body: { urls: ["https://iptv-org.github.io/iptv/index.m3u8", ...] }
+    """
+    data = request.json or {}
+    urls = data.get("urls", [])
+
+    if not urls:
+        return jsonify({"error": "URLs requeridas"}), 400
+
+    try:
+        cm = _get_channel_manager()
+        nuevos, vinculados = cm.load_from_free_lists(urls)
+        return jsonify({"ok": True, "nuevos": nuevos, "vinculados": vinculados})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+# ── Listado y gestión ──
+
+@app.route("/admin/channels", methods=["GET"])
+@admin_required
+def admin_list_channels():
+    """
+    Lista todos los canales lógicos con su estado.
+    Query params:
+        search: buscar por nombre
+        group: filtrar por grupo
+        estado: filtrar por estado (ok, caido, sin_fuente)
+        page, limit: paginación
+    """
+    from app import CanalLogico
+
     search = request.args.get("search", "").lower()
     group = request.args.get("group", "")
+    estado = request.args.get("estado", "")
     page = int(request.args.get("page", 1))
-    limit = min(int(request.args.get("limit", 100)), 500)
+    limit = min(int(request.args.get("limit", 50)), 200)
 
-    # Combinar canales según fuente
-    if source == "proveedor":
-        channels = _all_channels_cache["proveedor"]
-    elif source == "gratuitos":
-        channels = _all_channels_cache["gratuitos"]
-    else:
-        # Combinar ambos, marcando si es premium
-        channels = []
-        seen_urls = set()
-        for ch in _all_channels_cache["proveedor"]:
-            ch["is_premium"] = True
-            ch["unique_id"] = _get_channel_unique_id(ch)
-            channels.append(ch)
-            seen_urls.add(ch.get("url", ""))
+    query = CanalLogico.query.filter_by(activo=True)
 
-        for ch in _all_channels_cache["gratuitos"]:
-            ch["is_premium"] = False
-            ch["unique_id"] = _get_channel_unique_id(ch)
-            if ch.get("url", "") not in seen_urls:
-                channels.append(ch)
-                seen_urls.add(ch.get("url", ""))
-
-    # Filtros
     if search:
-        channels = [
-            ch for ch in channels
-            if search in (ch.get("name", "") or "").lower()
-            or search in (ch.get("display_name", "") or "").lower()
-            or search in (ch.get("tvg_id", "") or "").lower()
-        ]
+        query = query.filter(
+            db.or_(
+                CanalLogico.nombre.ilike(f"%{search}%"),
+                CanalLogico.canal_id.ilike(f"%{search}%"),
+            )
+        )
     if group:
-        channels = [
-            ch for ch in channels
-            if group.lower() in (ch.get("group", "") or "").lower()
-        ]
+        query = query.filter(CanalLogico.grupo.ilike(f"%{group}%"))
 
-    total = len(channels)
-    inicio = (page - 1) * limit
-    fin = inicio + limit
+    total = query.count()
+    canales = query.order_by(CanalLogico.prioridad, CanalLogico.nombre).offset(
+        (page - 1) * limit
+    ).limit(limit).all()
+
+    result = []
+    for ch in canales:
+        d = ch.to_dict()
+        # Agregar estado de la fuente activa
+        fuente = ch.get_fuente_activa()
+        d["fuente_estado"] = fuente.estado if fuente else "sin_fuente"
+        d["fuente_proveedor"] = fuente.proveedor if fuente else None
+        d["fuente_url"] = fuente.url if fuente and fuente.activo else None
+        result.append(d)
+
+    # Filtrar por estado si se pide
+    if estado:
+        result = [r for r in result if r.get("fuente_estado") == estado]
 
     # Grupos disponibles
-    grupos = list(set(
-        ch.get("group", "Sin categoría") or "Sin categoría"
-        for ch in channels
-    ))
+    grupos = db.session.query(CanalLogico.grupo).filter(
+        CanalLogico.activo == True,
+        CanalLogico.grupo != ""
+    ).distinct().all()
+    grupos = sorted([g[0] for g in grupos if g[0]])
 
     return jsonify({
         "total": total,
         "page": page,
         "limit": limit,
         "pages": (total + limit - 1) // limit,
-        "groups": sorted(grupos),
-        "premium_count": len(_all_channels_cache["proveedor"]),
-        "free_count": len(_all_channels_cache["gratuitos"]),
-        "channels": channels[inicio:fin],
+        "groups": grupos,
+        "canales": result,
     })
 
 
-@app.route("/admin/channels/refresh", methods=["POST"])
+@app.route("/admin/channels/<canal_id>/check", methods=["POST"])
 @admin_required
-def admin_refresh_channels():
-    """Fuerza la recarga de canales de todas las fuentes."""
-    _all_channels_cache["timestamp"] = 0
-    _load_all_channels()
+def admin_check_channel(canal_id):
+    """Verifica si un canal funciona y lo reemplaza si está caído."""
+    cm = _get_channel_manager()
+    estado, msg = cm.check_and_replace(canal_id)
+    return jsonify({"ok": True, "estado": estado, "mensaje": msg})
+
+
+@app.route("/admin/channels/check-all", methods=["POST"])
+@admin_required
+def admin_check_all_channels():
+    """Verifica todos los canales y reemplaza los caídos."""
+    cm = _get_channel_manager()
+    results = cm.auto_replace_all()
+    return jsonify({"ok": True, "results": results})
+
+
+@app.route("/admin/channels/<canal_id>/sources", methods=["GET"])
+@admin_required
+def admin_channel_sources(canal_id):
+    """Obtiene todas las fuentes de un canal."""
+    from app import CanalLogico
+
+    canal = CanalLogico.query.filter_by(canal_id=canal_id).first()
+    if not canal:
+        return jsonify({"error": "Canal no encontrado"}), 404
+
+    fuentes = canal.fuentes.order_by(CanalFuente.prioridad).all()
     return jsonify({
-        "ok": True,
-        "premium_count": len(_all_channels_cache["proveedor"]),
-        "free_count": len(_all_channels_cache["gratuitos"]),
+        "canal": canal.to_dict(),
+        "fuentes": [f.to_dict() for f in fuentes],
     })
 
 
-# ── APIs de listas por plan ──
-
-@app.route("/admin/lists", methods=["GET"])
+@app.route("/admin/channels/<canal_id>/sources", methods=["POST"])
 @admin_required
-def admin_get_lists():
-    """Obtiene todas las listas de canales por plan."""
-    with _custom_lists_lock:
-        return jsonify(_custom_lists)
+def admin_add_source(canal_id):
+    """Agrega una fuente manual a un canal."""
+    from app import CanalLogico, CanalFuente
+
+    data = request.json or {}
+    url = data.get("url", "").strip()
+    proveedor = data.get("proveedor", "manual").strip()
+    prioridad = data.get("prioridad", 2)
+
+    if not url:
+        return jsonify({"error": "URL requerida"}), 400
+
+    canal = CanalLogico.query.filter_by(canal_id=canal_id).first()
+    if not canal:
+        return jsonify({"error": "Canal no encontrado"}), 404
+
+    fuente = CanalFuente(
+        canal_logico_id=canal.id,
+        proveedor=proveedor,
+        url=url,
+        prioridad=prioridad,
+        activo=True,
+        estado="ok",
+    )
+    db.session.add(fuente)
+    db.session.commit()
+
+    return jsonify({"ok": True, "fuente": fuente.to_dict()})
 
 
-@app.route("/admin/lists/<plan>", methods=["GET"])
+@app.route("/admin/channels/<canal_id>/sources/<int:fuente_id>", methods=["DELETE"])
 @admin_required
-def admin_get_list(plan):
-    """Obtiene la lista de canales de un plan específico."""
-    with _custom_lists_lock:
-        lista = _custom_lists.get(plan, [])
+def admin_remove_source(canal_id, fuente_id):
+    """Desactiva una fuente."""
+    from app import CanalFuente
 
-    # Enriquecer con datos de los canales
-    _load_all_channels()
-    enriched = []
-    all_ch = {ch.get("unique_id", ""): ch for ch in _all_channels_cache["proveedor"]}
-    all_ch.update({ch.get("unique_id", ""): ch for ch in _all_channels_cache["gratuitos"]})
-
-    for item in lista:
-        ch_data = all_ch.get(item.get("channel_id", {}), {})
-        enriched.append({
-            **item,
-            "channel_name": ch_data.get("display_name", ch_data.get("name", "?")),
-            "channel_group": ch_data.get("group", ""),
-            "is_premium": ch_data.get("is_premium", False),
-        })
-
-    return jsonify({"plan": plan, "channels": enriched, "total": len(enriched)})
+    fuente = CanalFuente.query.get_or_404(fuente_id)
+    fuente.activo = False
+    fuente.estado = "desactivado"
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
-@app.route("/admin/lists/<plan>", methods=["POST"])
+@app.route("/admin/channels/stats", methods=["GET"])
 @admin_required
-def admin_save_list(plan):
+def admin_channels_stats():
+    """Estadísticas del sistema de canales."""
+    cm = _get_channel_manager()
+    return jsonify(cm.get_stats())
+
+
+# ── Listas por plan ──
+
+@app.route("/admin/plans/<plan>/channels", methods=["GET"])
+@admin_required
+def admin_plan_channels(plan):
+    """Obtiene los canales asignados a un plan."""
+    from app import CanalLogico, Paquete
+
+    paquete = Paquete.query.filter_by(nombre=plan).first()
+    if not paquete:
+        return jsonify({"error": "Plan no encontrado"}), 404
+
+    # Obtener canales del plan por categorías
+    categorias = [c.strip().upper() for c in paquete.categorias.split(",") if c.strip()]
+
+    canales = CanalLogico.query.filter_by(activo=True).order_by(
+        CanalLogico.prioridad, CanalLogico.nombre
+    ).all()
+
+    result = []
+    for canal in canales:
+        canal_grupo = (canal.grupo or "").upper()
+        if any(cat in canal_grupo or canal_grupo in cat for cat in categorias):
+            d = canal.to_dict()
+            d["in_plan"] = True
+            result.append(d)
+
+    return jsonify({
+        "plan": plan,
+        "canales": result,
+        "total": len(result),
+    })
+
+
+@app.route("/admin/plans/<plan>/channels", methods=["POST"])
+@admin_required
+def admin_save_plan_channels(plan):
     """
-    Guarda la lista de canales para un plan.
-    Body: { channels: [ { channel_id, name, order }, ... ] }
+    Guarda la lista de canales de un plan.
+    Body: { canales: [ { canal_id, nombre, orden }, ... ] }
     """
     data = request.json or {}
-    channels_list = data.get("channels", [])
+    canales = data.get("canales", [])
 
-    with _custom_lists_lock:
-        _custom_lists[plan] = channels_list
+    # Actualizar las categorías del paquete basado en los canales seleccionados
+    from app import CanalLogico, Paquete
 
-    logger.info(f"Lista de plan '{plan}' actualizada: {len(channels_list)} canales")
-    return jsonify({"ok": True, "total": len(channels_list)})
+    paquete = Paquete.query.filter_by(nombre=plan).first()
+    if not paquete:
+        return jsonify({"error": "Plan no encontrado"}), 404
+
+    # Guardar la lista como metadatos del paquete
+    paquete.categorias = json.dumps(canales)
+    db.session.commit()
+
+    return jsonify({"ok": True, "total": len(canales)})
 
 
-@app.route("/admin/lists/<plan>/add", methods=["POST"])
-@admin_required
-def admin_add_channel_to_plan(plan):
+# ── Generador de M3U por plan ──
+
+@app.route("/m3u/<plan>")
+def m3u_by_plan(plan):
+    """Genera lista M3U personalizada para un plan."""
+    usuario = request.args.get("username", "")
+    contrasena = request.args.get("password", "")
+
+    user, error = autenticar(usuario, contrasena)
+    if not user:
+        return "Acceso denegado", 403
+
+    if user.paquete != plan:
+        return "Plan no autorizado", 403
+
+    from app import CanalLogico, Paquete
+
+    paquete = Paquete.query.filter_by(nombre=plan).first()
+    if not paquete:
+        return "#EXTM3U\n# Plan no encontrado", 200
+
+    categorias = [c.strip().upper() for c in paquete.categorias.split(",") if c.strip()]
+    canales = CanalLogico.query.filter_by(activo=True).order_by(
+        CanalLogico.prioridad, CanalLogico.nombre
+    ).all()
+
+    m3u_lines = ["#EXTM3U"]
+    host = request.host_url.rstrip("/")
+
+    for canal in canales:
+        canal_grupo = (canal.grupo or "").upper()
+        if not any(cat in canal_grupo or canal_grupo in cat for cat in categorias):
+            continue
+
+        fuente = canal.get_fuente_activa()
+        if not fuente:
+            continue
+
+        name = canal.display_name or canal.nombre
+        logo = canal.logo or ""
+        tvg_id = canal.canal_id
+        group = canal.grupo or plan
+
+        extinf = f'#EXTINF:-1 tvg-id="{tvg_id}" tvg-logo="{logo}" group-title="{group}",{name}'
+        m3u_lines.append(extinf)
+        m3u_lines.append(f"{host}/live/{usuario}/{contrasena}/{canal.canal_id}")
+
+    return Response("\n".join(m3u_lines), content_type="application/x-mpegURL")
     """Agrega un canal a la lista de un plan."""
     data = request.json or {}
     channel_id = data.get("channel_id")
