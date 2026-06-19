@@ -37,9 +37,10 @@ body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min
 .card-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:16px}
 .form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;align-items:end}
 .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-weight:500}
-input,select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s}
-input:focus,select:focus{border-color:var(--accent)}
+input,select,textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:10px 12px;border-radius:10px;font-size:14px;font-family:'DM Sans',sans-serif;outline:none;transition:border .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
 select option{background:var(--surface)}
+textarea{resize:vertical;min-height:80px}
 .btn{padding:9px 16px;border-radius:10px;border:none;cursor:pointer;font-size:13px;font-weight:600;font-family:'DM Sans',sans-serif;transition:all .2s;white-space:nowrap}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-danger{background:var(--red);color:#fff}
@@ -52,6 +53,7 @@ select option{background:var(--surface)}
 .badge-green{background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.25)}
 .badge-red{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.25)}
 .badge-yellow{background:rgba(245,158,11,.15);color:var(--yellow);border:1px solid rgba(245,158,11,.25)}
+.badge-blue{background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.25)}
 .table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{width:100%;border-collapse:collapse;min-width:480px}
 th{text-align:left;padding:10px 14px;font-size:11px;color:var(--muted);border-bottom:1px solid var(--border);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
@@ -75,6 +77,37 @@ tr:hover td{background:rgba(255,255,255,.015)}
 .cred-val{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--accent);font-weight:600;word-break:break-all;text-align:right}
 .log-item{display:flex;align-items:center;gap:12px;padding:9px 16px;border-bottom:1px solid var(--border);font-size:13px}
 .log-item:last-child{border-bottom:none}
+/* Channel manager styles */
+.channel-search{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.channel-search input{flex:1;min-width:200px}
+.channel-search select{min-width:150px}
+.channel-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.channel-card{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;align-items:center;gap:12px}
+.channel-logo{width:48px;height:48px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.channel-info{flex:1;min-width:0}
+.channel-name{font-weight:600;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.channel-group{font-size:11px;color:var(--muted);margin-top:2px}
+.channel-sources{display:flex;gap:4px;margin-top:6px;flex-wrap:wrap}
+.source-badge{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+.source-premium{background:rgba(59,130,246,.2);color:var(--accent)}
+.source-free{background:rgba(16,185,129,.2);color:var(--green)}
+.source-caido{background:rgba(239,68,68,.2);color:var(--red)}
+.channel-check{margin-left:auto}
+.provider-section{margin-bottom:24px}
+.provider-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.provider-url{font-size:12px;color:var(--muted);font-family:'JetBrains Mono',monospace;word-break:break-all}
+.tabs{display:flex;gap:4px;margin-bottom:16px;border-bottom:1px solid var(--border);padding-bottom:0}
+.tab{padding:8px 16px;border-radius:8px 8px 0 0;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);border:none;background:none;font-family:'DM Sans',sans-serif}
+.tab.active{color:var(--accent);border-bottom:2px solid var(--accent)}
+.tab:hover{color:var(--text)}
+.toast{position:fixed;bottom:20px;right:20px;padding:12px 20px;border-radius:10px;font-size:13px;font-weight:600;z-index:300;animation:slideIn .3s ease}
+.toast-success{background:var(--green);color:#fff}
+.toast-error{background:var(--red);color:#fff}
+.toast-info{background:var(--accent);color:#fff}
+@keyframes slideIn{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+.loading{display:flex;align-items:center;justify-content:center;padding:40px;color:var(--muted)}
+.spinner{width:24px;height:24px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .6s linear infinite;margin-right:10px}
+@keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}
   .sidebar.open{transform:translateX(0)}
@@ -83,6 +116,7 @@ tr:hover td{background:rgba(255,255,255,.015)}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
   .form-grid{grid-template-columns:1fr}
   .page-title{font-size:18px}
+  .channel-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -104,8 +138,9 @@ tr:hover td{background:rgba(255,255,255,.015)}
     <button class="nav-item" onclick="showPage('usuarios',this)"><span>👥</span>Usuarios</button>
     <button class="nav-item" onclick="showPage('nuevo',this)"><span>➕</span>Nuevo usuario</button>
     <button class="nav-item" onclick="showPage('clientes',this)"><span>👤</span>Clientes CRM</button>
-    <button class="nav-item" onclick="showPage('logs',this)"><span>📋</span>Logs de acceso</button>
+    <button class="nav-item" onclick="showPage('logs',this)"><span>📋</span>Logs</button>
     <button class="nav-item" onclick="showPage('whatsapp',this)"><span>💬</span>WhatsApp</button>
+    <button class="nav-item" onclick="showPage('canales',this)"><span>📺</span>Canales</button>
     <button class="nav-item" onclick="showPage('paquetes',this)"><span>📦</span>Paquetes</button>
   </nav>
   <div class="sidebar-footer">
@@ -115,7 +150,9 @@ tr:hover td{background:rgba(255,255,255,.015)}
 
 <div class="main">
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- DASHBOARD -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page active" id="page-dashboard">
     <div class="page-title">Dashboard</div>
     <div class="stats-grid">
@@ -124,19 +161,25 @@ tr:hover td{background:rgba(255,255,255,.015)}
       <div class="stat-card"><div class="stat-val" id="s-online" style="color:var(--accent2)">—</div><div class="stat-label">Online</div></div>
       <div class="stat-card"><div class="stat-val" id="s-expirados" style="color:var(--yellow)">—</div><div class="stat-label">Expirados</div></div>
       <div class="stat-card"><div class="stat-val" id="s-ingresos" style="color:var(--green)">—</div><div class="stat-label">Ingresos mes</div></div>
+      <div class="stat-card"><div class="stat-val" id="s-canales" style="color:var(--accent)">—</div><div class="stat-label">Canales</div></div>
     </div>
     <div class="card">
       <div class="card-title">Ingresos últimos 6 meses</div>
       <canvas id="chart-ingresos" height="100"></canvas>
     </div>
     <div class="card">
-      <div style="font-size:13px;color:#93c5fd;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px">
-        ✅ Sistema activo · Control: MAC · IP simultánea · Expiración
+      <div class="card-title">Estado del sistema</div>
+      <div id="system-status" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+        <div style="font-size:13px;color:#93c5fd;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);border-radius:10px;padding:12px">✅ Sistema activo</div>
+        <div style="font-size:13px;color:#86efac;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:12px" id="status-canales">📺 Canales: cargando...</div>
+        <div style="font-size:13px;color:#fde68a;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:12px" id="status-wa">💬 WhatsApp: cargando...</div>
       </div>
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- USUARIOS -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page" id="page-usuarios">
     <div class="page-title">Usuarios</div>
     <div class="card" style="padding:0;overflow:hidden">
@@ -149,14 +192,16 @@ tr:hover td{background:rgba(255,255,255,.015)}
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- NUEVO USUARIO -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page" id="page-nuevo">
     <div class="page-title">Nuevo usuario</div>
     <div class="card">
       <div class="form-grid">
         <div class="field"><label>Nombre de usuario</label><input id="nu-usuario" placeholder="ej: cliente01"></div>
-        <div class="field"><label>Paquete de contenido</label><select id="nu-paquete"><option value="basico">Básico</option><option value="premium">Premium</option><option value="familiar">Familiar</option></select></div>
-        <div class="field"><label>Pantallas simultáneas</label><select id="nu-pantallas"><option value="1">1 pantalla</option><option value="2">2 pantallas</option><option value="3">3 pantallas</option><option value="4">4 pantallas</option><option value="5">5 pantallas</option></select></div>
+        <div class="field"><label>Paquete</label><select id="nu-paquete"><option value="basico">Básico</option><option value="estandar">Estándar</option><option value="premium">Premium</option></select></div>
+        <div class="field"><label>Pantallas simultáneas</label><select id="nu-pantallas"><option value="1">1 pantalla</option><option value="2">2 pantallas</option><option value="3">3 pantallas</option></select></div>
         <div class="field"><label>Días</label><select id="nu-dias"><option value="7">7 días</option><option value="30" selected>30 días</option><option value="90">90 días</option><option value="365">1 año</option></select></div>
         <div class="field"><label>WhatsApp</label><input id="nu-notas" placeholder="+57 300 123 4567"></div>
         <div class="field" style="align-self:end"><button class="btn btn-primary" style="width:100%" onclick="crearUsuario()">Crear usuario</button></div>
@@ -164,33 +209,144 @@ tr:hover td{background:rgba(255,255,255,.015)}
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- CRM -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page" id="page-clientes">
     <div class="page-title">Clientes CRM</div>
     <div id="crm-container" class="client-cards"></div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- LOGS -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page" id="page-logs">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">
       <div class="page-title" style="margin:0">Logs de acceso</div>
       <button class="btn btn-ghost btn-sm" onclick="cargarLogs()">🔄 Actualizar</button>
     </div>
     <div class="card" style="padding:0;overflow:hidden">
-      <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:20px">
-        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;flex:0 0 24px">#</span>
-        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;min-width:90px">Usuario</span>
-        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;flex:1">Canal</span>
-        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;min-width:110px">IP</span>
-        <span style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;min-width:130px;text-align:right">Fecha</span>
-      </div>
       <div id="lista-logs"><div style="padding:32px;text-align:center;color:var(--muted)">Cargando...</div></div>
     </div>
   </div>
 
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- WHATSAPP -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-whatsapp">
+    <div class="page-title">💬 WhatsApp</div>
+    <div class="card">
+      <div class="card-title">Estado de conexión</div>
+      <div id="wa-status-box" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+        <div id="wa-badge" class="badge badge-red">⚫ Desconectado</div>
+        <a href="/wa/qr" target="_blank" class="btn btn-ghost btn-sm">📱 Ver QR / Conectar</a>
+        <button class="btn btn-ghost btn-sm" onclick="checkWaStatus()">🔄 Actualizar</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">Avisos automáticos de vencimiento</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Envía avisos a clientes cuya suscripción está por vencer.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+        <div class="field"><label>Días de anticipación</label><select id="wa-dias-aviso" style="width:180px"><option value="1">1 día</option><option value="2">2 días</option><option value="3" selected>3 días</option><option value="5">5 días</option><option value="7">7 días</option></select></div>
+        <div class="field" style="align-self:end"><button class="btn btn-wa" onclick="notificarVencimiento()">📤 Enviar avisos</button></div>
+      </div>
+      <div id="wa-notify-result" style="margin-top:14px"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Mensaje manual</div>
+      <div class="form-grid">
+        <div class="field"><label>Número</label><input id="wa-phone" placeholder="+57 300 123 4567"></div>
+        <div class="field"><label>Mensaje</label><input id="wa-msg" placeholder="Escribe el mensaje..."></div>
+        <div class="field" style="align-self:end"><button class="btn btn-wa" style="width:100%" onclick="enviarMensajeManual()">💬 Enviar</button></div>
+      </div>
+      <div id="wa-send-result" style="margin-top:10px"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <!-- CANALES -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
+  <div class="page" id="page-canales">
+    <div class="page-title">📺 Canales y Proveedores</div>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <button class="tab active" onclick="showCanalTab('proveedor',this)">Proveedor</button>
+      <button class="tab" onclick="showCanalTab('canales',this)">Canales</button>
+      <button class="tab" onclick="showCanalTab('backup',this)">Backup Gratuito</button>
+    </div>
+
+    <!-- Tab: Proveedor -->
+    <div id="tab-proveedor">
+      <div class="card">
+        <div class="card-title">Proveedor actual</div>
+        <div id="provider-current" style="margin-bottom:16px">
+          <div class="loading"><div class="spinner"></div>Cargando...</div>
+        </div>
+        <div class="form-grid">
+          <div class="field"><label>URL M3U del proveedor</label><input id="prov-url" placeholder="http://proveedor.com/get.php?username=X&password=Y&type=m3u_plus"></div>
+          <div class="field"><label>Nombre del proveedor</label><input id="prov-nombre" placeholder="Mi Proveedor"></div>
+          <div class="field" style="align-self:end">
+            <button class="btn btn-primary" style="width:100%" onclick="loadProvider()">📥 Cargar proveedor</button>
+          </div>
+        </div>
+        <div id="load-result" style="margin-top:12px"></div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">Cambiar de proveedor</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Al cambiar, las URLs del proveedor anterior se desactivan y se cargan las del nuevo. Los canales se vinculan automáticamente por nombre.</p>
+        <div class="form-grid">
+          <div class="field"><label>Proveedor anterior</label><select id="prov-anterior"><option value="">Ninguno (primera carga)</option></select></div>
+          <div class="field"><label>URL del nuevo proveedor</label><input id="prov-nueva-url" placeholder="http://nuevo.com/get.php?username=X&password=Y"></div>
+          <div class="field"><label>Nombre del nuevo proveedor</label><input id="prov-nuevo-nombre" placeholder="Nuevo Proveedor"></div>
+          <div class="field" style="align-self:end">
+            <button class="btn btn-warn" style="width:100%" onclick="changeProvider()">🔄 Cambiar proveedor</button>
+          </div>
+        </div>
+        <div id="change-result" style="margin-top:12px"></div>
+      </div>
+    </div>
+
+    <!-- Tab: Canales -->
+    <div id="tab-canales" style="display:none">
+      <div class="card">
+        <div class="card-title">Buscar canales</div>
+        <div class="channel-search">
+          <input id="canal-search" placeholder="Buscar por nombre..." oninput="filterChannels()">
+          <select id="canal-filter-grupo" onchange="filterChannels()"><option value="">Todos los grupos</option></select>
+          <select id="canal-filter-estado" onchange="filterChannels()"><option value="">Todos los estados</option><option value="ok">✅ Activo</option><option value="caido">⚠️ Caído</option><option value="sin_fuente">❌ Sin fuente</option></select>
+          <button class="btn btn-ghost btn-sm" onclick="loadAllChannels()">🔄 Recargar</button>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin:0">Canales (<span id="canal-count">0</span>)</div>
+          <button class="btn btn-sm btn-ghost" onclick="checkAllChannels()">🔍 Verificar todos</button>
+        </div>
+        <div id="canal-list" class="channel-grid">
+          <div class="loading"><div class="spinner"></div>Cargando canales...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab: Backup -->
+    <div id="tab-backup" style="display:none">
+      <div class="card">
+        <div class="card-title">Cargar listas gratuitas (backup)</div>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:16px">Estos canales se usan como respaldo cuando los del proveedor caen. Se vinculan automáticamente por nombre.</p>
+        <div class="field"><label>URLs de listas M3U (una por línea)</label><textarea id="free-urls" rows="4" placeholder="https://ejemplo.com/lista1.m3u8&#10;https://ejemplo.com/lista2.m3u8"></textarea></div>
+        <button class="btn btn-green" onclick="loadFreeChannels()" style="margin-top:12px">📥 Cargar backups</button>
+        <div id="free-result" style="margin-top:12px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <!-- PAQUETES -->
+  <!-- ═══════════════════════════════════════════════════════════════ -->
   <div class="page" id="page-paquetes">
-    <div class="page-title">📦 Paquetes de contenido</div>
+    <div class="page-title">📦 Paquetes</div>
     <div class="card">
       <div class="card-title">Paquetes activos</div>
       <div id="paquetes-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px;margin-bottom:20px"></div>
@@ -204,53 +360,6 @@ tr:hover td{background:rgba(255,255,255,.015)}
         <button class="btn btn-primary" onclick="guardarPaquete()">💾 Guardar</button>
         <button class="btn btn-ghost" onclick="cancelarPaquete()">Cancelar</button>
       </div>
-    </div>
-  </div>
-
-  <!-- WHATSAPP -->
-  <div class="page" id="page-whatsapp">
-    <div class="page-title">💬 WhatsApp</div>
-
-    <div class="card">
-      <div class="card-title">Estado de conexión</div>
-      <div id="wa-status-box" style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
-        <div id="wa-badge" class="badge badge-red">⚫ Desconectado</div>
-        <a href="/wa/qr" target="_blank" class="btn btn-ghost btn-sm">📱 Ver QR / Conectar</a>
-        <button class="btn btn-ghost btn-sm" onclick="checkWaStatus()">🔄 Actualizar estado</button>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Notificaciones automáticas</div>
-      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">
-        Envía avisos a clientes cuya suscripción está por vencer. Solo se envía a clientes que tienen WhatsApp registrado.
-      </p>
-      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
-        <div class="field">
-          <label>Avisar con X días de anticipación</label>
-          <select id="wa-dias-aviso" style="width:180px">
-            <option value="1">1 día antes</option>
-            <option value="2">2 días antes</option>
-            <option value="3" selected>3 días antes</option>
-            <option value="5">5 días antes</option>
-            <option value="7">7 días antes</option>
-          </select>
-        </div>
-        <div class="field" style="align-self:end">
-          <button class="btn btn-wa" onclick="notificarVencimiento()">📤 Enviar avisos ahora</button>
-        </div>
-      </div>
-      <div id="wa-notify-result" style="margin-top:14px"></div>
-    </div>
-
-    <div class="card">
-      <div class="card-title">Enviar mensaje manual</div>
-      <div class="form-grid">
-        <div class="field"><label>Número WhatsApp</label><input id="wa-phone" placeholder="+57 300 123 4567"></div>
-        <div class="field"><label>Mensaje</label><input id="wa-msg" placeholder="Escribe el mensaje..."></div>
-        <div class="field" style="align-self:end"><button class="btn btn-wa" style="width:100%" onclick="enviarMensajeManual()">💬 Enviar</button></div>
-      </div>
-      <div id="wa-send-result" style="margin-top:10px"></div>
     </div>
   </div>
 
@@ -308,11 +417,31 @@ tr:hover td{background:rgba(255,255,255,.015)}
   </div>
 </div>
 
+<!-- MODAL FUENTES CANAL -->
+<div class="modal" id="modal-fuentes">
+  <div class="modal-box" style="max-width:600px">
+    <h3>📡 Fuentes — <span id="fuentes-nombre"></span></h3>
+    <div id="lista-fuentes" style="margin:14px 0"></div>
+    <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:14px">
+      <div class="form-grid">
+        <div class="field"><label>URL de la fuente</label><input id="fuente-url" placeholder="http://..."></div>
+        <div class="field"><label>Proveedor</label><input id="fuente-proveedor" placeholder="manual"></div>
+        <div class="field" style="align-self:end"><button class="btn btn-primary" style="width:100%" onclick="addFuente()">+ Agregar</button></div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" style="width:100%;margin-top:12px" onclick="cerrarModal('modal-fuentes')">Cerrar</button>
+  </div>
+</div>
+
 <script>
 const API = window.location.origin;
 let lastCreds = {}, pagoUsuarioId = null, chartInst = null;
+let allChannels = [], currentCanalId = null;
 
-// JWT Auth helper
+// ════════════════════════════════════════════════════════════════
+// AUTH
+// ════════════════════════════════════════════════════════════════
+
 function getAuthHeaders() {
   const token = localStorage.getItem('sf_token');
   return token ? {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'} : {'Content-Type': 'application/json'};
@@ -336,7 +465,11 @@ function logout(){
   window.location.href = '/panel/login';
 }
 
-function toggleSidebar(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('open')}
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('overlay').classList.toggle('open')
+}
+
 function cerrarModal(id){document.getElementById(id).classList.remove('open')}
 
 function showPage(p,btn){
@@ -351,7 +484,20 @@ function showPage(p,btn){
   if(p==='clientes')cargarCRM();
   if(p==='paquetes')cargarPaquetes();
   if(p==='whatsapp')checkWaStatus();
+  if(p==='canales')loadProviderStats();
 }
+
+function toast(msg, type='info'){
+  const t = document.createElement('div');
+  t.className = 'toast toast-'+type;
+  t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(), 3000);
+}
+
+// ════════════════════════════════════════════════════════════════
+// DASHBOARD
+// ════════════════════════════════════════════════════════════════
 
 async function cargarStats(){
   try{
@@ -374,262 +520,475 @@ async function cargarStats(){
     if(chartInst)chartInst.destroy();
     chartInst=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(59,130,246,.7)',borderRadius:8,borderSkipped:false}]},options:{plugins:{legend:{display:false}},scales:{x:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}},y:{ticks:{color:'#64748b',font:{family:'DM Sans'}},grid:{color:'#1e2a42'}}}}});
   }catch(e){}
+  // Canal stats
+  try{
+    const r3 = await authFetch(API+'/admin/channels/stats');
+    if(!r3) return;
+    const d3 = await r3.json();
+    document.getElementById('s-canales').textContent=d3.total_canales||0;
+    document.getElementById('status-canales').textContent='📺 Canales: '+(d3.total_canales||0)+' | Premium: '+(d3.fuentes_premium||0)+' | Backup: '+(d3.fuentes_gratis||0);
+  }catch(e){}
 }
+
+// ════════════════════════════════════════════════════════════════
+// USUARIOS
+// ════════════════════════════════════════════════════════════════
 
 async function cargarUsuarios(){
   const tbody=document.getElementById('tabla-usuarios');
-  try{const r=await authFetch(API+'/admin/usuarios');const users=await r.json();
-  if(!users.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Sin usuarios</td></tr>';return;}
-  tbody.innerHTML=users.map(u=>{
-    const estado=!u.activo?'<span class="badge badge-red">Suspendido</span>':u.expira_en_dias<=0?'<span class="badge badge-yellow">Expirado</span>':u.expira_en_dias<=5?'<span class="badge badge-yellow">⚠️ Vence</span>':'<span class="badge badge-green">● Activo</span>';
-    return`<tr><td><strong>${u.usuario}</strong>${u.notas?`<div style="font-size:11px;color:var(--wa)">📱 ${u.notas}</div>`:''}</td><td style="color:var(--muted)">${u.paquete}</td><td>${estado}</td><td style="font-size:12px;color:var(--muted)">${u.expira_en_dias>0?u.expira_en_dias+'d':'Exp.'}</td><td style="font-size:12px">${u.conexiones_activas}/${u.max_conexiones}</td><td><button class="btn btn-ghost btn-sm" onclick="verMacs(${u.id},'${u.usuario}')">${u.macs_registradas}</button></td><td><div class="actions"><button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.2)" onclick="verPagos(${u.id},'${u.usuario}')">💰</button><button class="btn btn-sm" style="background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.2)" onclick="verLogsUsuario(${u.id},'${u.usuario}')">📋</button><button class="btn btn-sm" style="background:rgba(139,92,246,.15);color:var(--accent2);border:1px solid rgba(139,92,246,.2)" onclick="resetPass(${u.id},'${u.usuario}')">🔑</button><button class="btn btn-warn btn-sm" onclick="renovar(${u.id})">↺</button><button class="btn btn-ghost btn-sm" onclick="suspender(${u.id})">${u.activo?'⏸':'▶'}</button><button class="btn btn-danger btn-sm" onclick="eliminar(${u.id},'${u.usuario}')">✕</button></div></td></tr>`;
-  }).join('');}catch(e){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red)">Error</td></tr>';}
+  try{
+    const r=await authFetch(API+'/admin/usuarios');
+    const users=await r.json();
+    if(!users.length){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--muted)">Sin usuarios</td></tr>';return;}
+    tbody.innerHTML=users.map(u=>{
+      const estado=!u.activo?'<span class="badge badge-red">Suspendido</span>':u.expira_en_dias<=0?'<span class="badge badge-yellow">Expirado</span>':u.expira_en_dias<=5?'<span class="badge badge-yellow">⚠️ Vence</span>':'<span class="badge badge-green">● Activo</span>';
+      return`<tr><td><strong>${u.usuario}</strong>${u.notas?`<div style="font-size:11px;color:var(--wa)">📱 ${u.notas}</div>`:''}</td><td style="color:var(--muted)">${u.paquete}</td><td>${estado}</td><td style="font-size:12px;color:var(--muted)">${u.expira_en_dias>0?u.expira_en_dias+'d':'Exp.'}</td><td style="font-size:12px">${u.conexiones_activas}/${u.max_conexiones}</td><td><button class="btn btn-ghost btn-sm" onclick="verMacs(${u.id},'${u.usuario}')">${u.macs_registradas}</button></td><td><div class="actions"><button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.2)" onclick="verPagos(${u.id},'${u.usuario}')">💰</button><button class="btn btn-sm" style="background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.2)" onclick="verLogsUsuario(${u.id},'${u.usuario}')">📋</button><button class="btn btn-sm" style="background:rgba(139,92,246,.15);color:var(--accent2);border:1px solid rgba(139,92,246,.2)" onclick="resetPass(${u.id},'${u.usuario}')">🔑</button><button class="btn btn-warn btn-sm" onclick="renovar(${u.id})">↺</button><button class="btn btn-ghost btn-sm" onclick="suspender(${u.id})">${u.activo?'⏸':'▶'}</button><button class="btn btn-danger btn-sm" onclick="eliminar(${u.id},'${u.usuario}')">✕</button></div></td></tr>`;
+    }).join('');
+  }catch(e){tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:32px;color:var(--red)">Error</td></tr>';}
 }
 
 async function crearUsuario(){
   const usuario=document.getElementById('nu-usuario').value.trim();
-  if(!usuario){alert('Escribe un nombre de usuario');return;}
-  const r=await authFetch(API+'/admin/usuarios',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({usuario,paquete:document.getElementById('nu-paquete').value,dias:document.getElementById('nu-dias').value,notas:document.getElementById('nu-notas').value})});
+  if(!usuario){toast('Escribe un nombre de usuario','error');return;}
+  const r=await authFetch(API+'/admin/usuarios',{method:'POST',body:JSON.stringify({usuario,paquete:document.getElementById('nu-paquete').value,dias:parseInt(document.getElementById('nu-dias').value),pantallas:parseInt(document.getElementById('nu-pantallas').value),notas:document.getElementById('nu-notas').value})});
   const d=await r.json();
-  if(!r.ok){alert(d.error||'Error al crear');return;}
-  lastCreds=d;mostrarCreds(d,'✅ Usuario creado');
-  document.getElementById('nu-usuario').value='';document.getElementById('nu-notas').value='';
+  if(!r.ok){toast(d.error||'Error al crear','error');return;}
+  lastCreds=d;
+  mostrarCreds(d,'✅ Usuario creado');
+  document.getElementById('nu-usuario').value='';
+  document.getElementById('nu-notas').value='';
+  toast('Usuario creado exitosamente','success');
 }
 
 function mostrarCreds(d,titulo){
-  const host=window.location.origin;
   document.getElementById('modal-cred-title').textContent=titulo;
-  document.getElementById('c-url').textContent=`${host}/get.php?username=${d.usuario}&password=${d.contrasena}`;
+  document.getElementById('c-url').textContent=d.url||API+'/get.php?username='+d.usuario+'&password='+d.password+'&type=m3u_plus';
   document.getElementById('c-user').textContent=d.usuario;
-  document.getElementById('c-pass').textContent=d.contrasena;
-  document.getElementById('c-pkg').textContent=d.paquete||'—';
-  document.getElementById('c-exp').textContent=d.expira?new Date(d.expira).toLocaleDateString('es-CO'):'—';
+  document.getElementById('c-pass').textContent=d.password;
+  document.getElementById('c-pkg').textContent=d.paquete;
+  document.getElementById('c-exp').textContent=d.expira;
   document.getElementById('modal-cred').classList.add('open');
 }
 
 function copiarCreds(){
-  const host=window.location.origin;
-  const txt=`📺 *Acceso StreamFlow*\n*App:* IPTV Smarters Pro\n*URL:* ${host}\n*Usuario:* ${lastCreds.usuario}\n*Contraseña:* ${lastCreds.contrasena}\n*Paquete:* ${lastCreds.paquete}\n*Expira:* ${new Date(lastCreds.expira).toLocaleDateString('es-CO')}\n_Soporte vía WhatsApp_`;
-  navigator.clipboard.writeText(txt).then(()=>alert('✅ Copiado'));
+  const text=`⚡ *StreamFlow IPTV*\n\n📺 *Credenciales de acceso:*\n\n🌐 URL: ${document.getElementById('c-url').textContent}\n👤 Usuario: ${document.getElementById('c-user').textContent}\n🔑 Contraseña: ${document.getElementById('c-pass').textContent}\n📦 Paquete: ${document.getElementById('c-pkg').textContent}\n📅 Expira: ${document.getElementById('c-exp').textContent}\n\n📱 *Apps recomendadas:*\n• TiviMate (Android)\n• IPTV Smarters (iOS/Android)\n• VLC (PC)`;
+  navigator.clipboard.writeText(text);
+  toast('Credenciales copiadas al portapapeles','success');
 }
 
-async function verMacs(uid,nombre){
+async function verMacs(id,nombre){
   document.getElementById('macs-nombre').textContent=nombre;
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/macs');
+  const macs=await r.json();
+  document.getElementById('lista-macs').innerHTML=macs.length?macs.map(m=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:'JetBrains Mono',monospace;font-size:12px">${m.mac}</span><span style="font-size:11px;color:var(--muted)">${m.nombre}</span><span style="font-size:11px;color:var(--muted)">${new Date(m.registrada).toLocaleDateString()}</span></div>`).join(''):'<div style="color:var(--muted);text-align:center;padding:16px">Sin dispositivos</div>';
   document.getElementById('modal-macs').classList.add('open');
-  const r=await authFetch(API+`/admin/usuarios/${uid}/macs`);const macs=await r.json();
-  const lista=document.getElementById('lista-macs');
-  lista.innerHTML=macs.length?macs.map(m=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg);border-radius:10px;margin-bottom:8px"><div><div style="font-size:13px;font-weight:600">${m.nombre}</div><div style="font-size:11px;color:var(--muted);font-family:'JetBrains Mono',monospace">${m.mac}</div></div><button class="btn btn-danger btn-sm" onclick="revocarMac(${m.id})">✕</button></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Sin dispositivos</p>';
 }
-async function revocarMac(mid){if(!confirm('¿Revocar?'))return;await authFetch(API+`/admin/macs/${mid}`,{method:'DELETE'});cerrarModal('modal-macs');}
 
-async function verPagos(uid,nombre){pagoUsuarioId=uid;document.getElementById('pagos-nombre').textContent=nombre;document.getElementById('modal-pagos').classList.add('open');await recargarPagos();}
-async function recargarPagos(){
-  const r=await authFetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`);const pagos=await r.json();
-  const lista=document.getElementById('lista-pagos');
-  if(!pagos.length){lista.innerHTML='<p style="color:var(--muted);font-size:13px">Sin pagos</p>';return;}
-  const total=pagos.reduce((s,p)=>s+p.monto,0);
-  lista.innerHTML=`<div style="text-align:right;color:var(--green);font-weight:700;margin-bottom:10px">Total: $${total.toLocaleString('es-CO')}</div>`+pagos.map(p=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px;background:var(--bg);border-radius:10px;margin-bottom:6px"><div><div style="font-weight:600;color:var(--green)">$${p.monto.toLocaleString('es-CO')} <span style="color:var(--muted);font-weight:400;font-size:12px">— ${p.metodo}</span></div>${p.notas?`<div style="font-size:12px;color:var(--muted)">${p.notas}</div>`:''}<div style="font-size:11px;color:var(--muted)">${new Date(p.fecha).toLocaleDateString('es-CO')}</div></div><button class="btn btn-danger btn-sm" onclick="eliminarPago(${p.id})">✕</button></div>`).join('');
+async function verPagos(id,nombre){
+  pagoUsuarioId=id;
+  document.getElementById('pagos-nombre').textContent=nombre;
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/pagos');
+  const pagos=await r.json();
+  document.getElementById('lista-pagos').innerHTML=pagos.length?pagos.map(p=>`<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span style="color:var(--green);font-weight:600">$${p.monto.toLocaleString('es-CO')}</span><span style="font-size:12px;color:var(--muted)">${p.metodo}</span><span style="font-size:11px;color:var(--muted)">${new Date(p.fecha).toLocaleDateString()}</span></div>`).join(''):'<div style="color:var(--muted);text-align:center;padding:16px">Sin pagos</div>';
+  document.getElementById('modal-pagos').classList.add('open');
 }
+
 async function registrarPago(){
   const monto=parseFloat(document.getElementById('pago-monto').value);
-  if(!monto||monto<=0){alert('Monto inválido');return;}
-  await authFetch(API+`/admin/usuarios/${pagoUsuarioId}/pagos`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({monto,metodo:document.getElementById('pago-metodo').value,notas:document.getElementById('pago-notas').value})});
-  document.getElementById('pago-monto').value='';document.getElementById('pago-notas').value='';
-  await recargarPagos();cargarStats();
-}
-async function eliminarPago(pid){if(!confirm('¿Eliminar?'))return;await authFetch(API+`/admin/pagos/${pid}`,{method:'DELETE'});await recargarPagos();cargarStats();}
-
-async function cargarLogs(){
-  const lista=document.getElementById('lista-logs');
-  try{const r=await authFetch(API+'/admin/logs');const logs=await r.json();
-  if(!logs.length){lista.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Sin actividad</div>';return;}
-  lista.innerHTML=logs.map((l,i)=>`<div class="log-item"><span style="color:var(--muted);font-size:11px;min-width:24px">${i+1}</span><span style="font-weight:600;min-width:90px">${l.usuario}</span><span style="font-family:\'JetBrains Mono\',monospace;color:var(--accent);font-size:12px;flex:1">${l.canal}</span><span style="color:var(--muted);font-size:11px;min-width:110px">${l.ip}</span><span style="color:var(--muted);font-size:11px;min-width:130px;text-align:right">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join('');}catch(e){lista.innerHTML='<div style="padding:32px;text-align:center;color:var(--red)">Error</div>';}
+  if(!monto){toast('Escribe un monto','error');return;}
+  const r=await authFetch(API+'/admin/usuarios/'+pagoUsuarioId+'/pagos',{method:'POST',body:JSON.stringify({monto,metodo:document.getElementById('pago-metodo').value,notas:document.getElementById('pago-notas').value})});
+  if(r.ok){toast('Pago registrado','success');verPagos(pagoUsuarioId,document.getElementById('pagos-nombre').textContent);document.getElementById('pago-monto').value='';}
+  else toast('Error al registrar','error');
 }
 
-async function verLogsUsuario(uid,nombre){
+async function verLogsUsuario(id,nombre){
   document.getElementById('logs-user-nombre').textContent=nombre;
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/logs');
+  const logs=await r.json();
+  document.getElementById('lista-logs-user').innerHTML=logs.length?logs.map(l=>`<div class="log-item"><span style="min-width:90px;font-weight:600">${l.canal||'—'}</span><span style="font-size:11px;color:var(--muted)">${l.ip||'—'}</span><span style="font-size:11px;color:var(--muted);margin-left:auto">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join(''):'<div style="color:var(--muted);text-align:center;padding:16px">Sin actividad</div>';
   document.getElementById('modal-logs-user').classList.add('open');
-  const r=await authFetch(API+`/admin/usuarios/${uid}/logs`);const logs=await r.json();
-  const lista=document.getElementById('lista-logs-user');
-  lista.innerHTML=logs.length?logs.map(l=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-family:\'JetBrains Mono\',monospace;color:var(--accent);font-size:12px">${l.canal}</span><span style="color:var(--muted);font-size:11px">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join(''):'<p style="color:var(--muted);font-size:13px">Sin actividad</p>';
 }
+
+async function resetPass(id,nombre){
+  if(!confirm('¿Resetear contraseña de '+nombre+'?'))return;
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/reset-password',{method:'POST'});
+  if(r.ok){const d=await r.json();toast('Nueva contraseña: '+d.new_password,'success');}
+  else toast('Error','error');
+}
+
+async function renovar(id){
+  const dias=prompt('¿Cuántos días agregar?','30');
+  if(!dias)return;
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/renovar',{method:'POST',body:JSON.stringify({dias:parseInt(dias)})});
+  if(r.ok){toast('Usuario renovado','success');cargarUsuarios();}
+  else toast('Error','error');
+}
+
+async function suspender(id){
+  const r=await authFetch(API+'/admin/usuarios/'+id+'/suspender',{method:'POST'});
+  if(r.ok){toast('Estado cambiado','success');cargarUsuarios();}
+  else toast('Error','error');
+}
+
+async function eliminar(id,nombre){
+  if(!confirm('¿Eliminar a '+nombre+'? Esta acción no se puede deshacer.'))return;
+  const r=await authFetch(API+'/admin/usuarios/'+id,{method:'DELETE'});
+  if(r.ok){toast('Usuario eliminado','success');cargarUsuarios();}
+  else toast('Error','error');
+}
+
+// ════════════════════════════════════════════════════════════════
+// CRM
+// ════════════════════════════════════════════════════════════════
 
 async function cargarCRM(){
-  const cont=document.getElementById('crm-container');
-  cont.innerHTML='<div style="color:var(--muted);grid-column:1/-1">Cargando...</div>';
+  const container=document.getElementById('crm-container');
   try{
-    const[rU,rL]=await Promise.all([authFetch(API+'/admin/usuarios'),authFetch(API+'/admin/logs')]);
-    const users=await rU.json();const logs=await rL.json();
-    const ultimoAcceso={};logs.forEach(l=>{if(!ultimoAcceso[l.usuario])ultimoAcceso[l.usuario]=l.fecha;});
-    const pagosUser={};
-    await Promise.all(users.map(async u=>{const r=await authFetch(API+`/admin/usuarios/${u.id}/pagos`);const p=await r.json();pagosUser[u.id]=p.reduce((s,x)=>s+x.monto,0);}));
-    cont.innerHTML=users.map(u=>{
-      const estado=!u.activo?'<span class="badge badge-red">Suspendido</span>':u.expira_en_dias<=0?'<span class="badge badge-yellow">Expirado</span>':u.expira_en_dias<=5?'<span class="badge badge-yellow">⚠️ Por vencer</span>':'<span class="badge badge-green">● Activo</span>';
-      const ultimo=ultimoAcceso[u.usuario]?new Date(ultimoAcceso[u.usuario]).toLocaleDateString('es-CO'):'Sin actividad';
-      const total=pagosUser[u.id]?'$'+pagosUser[u.id].toLocaleString('es-CO'):'$0';
-      const wa=u.notas?u.notas.replace(/[^0-9]/g,''):'';
-      return`<div class="client-card"><div class="client-card-header"><div class="client-name">${u.usuario}</div>${estado}</div>${u.notas?`<div style="color:var(--wa);font-size:13px;font-weight:500;margin-bottom:8px">📱 ${u.notas}</div>`:'<div style="color:var(--muted);font-size:12px;margin-bottom:8px">Sin WhatsApp</div>'}<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12px;color:var(--muted)"><div>📦 ${u.paquete}</div><div>⏳ ${u.expira_en_dias>0?u.expira_en_dias+'d':'Exp.'}</div><div style="color:var(--green);font-weight:600">💰 ${total}</div><div>🕐 ${ultimo}</div></div><div class="client-footer">${wa?`<button class="btn btn-wa btn-sm" onclick="window.open('https://wa.me/${wa}','_blank')">💬 WhatsApp</button>`:''}<button class="btn btn-ghost btn-sm" onclick="verPagos(${u.id},'${u.usuario}')">💰 Pagos</button><button class="btn btn-warn btn-sm" onclick="renovar(${u.id})">↺ Renovar</button></div></div>`;
-    }).join('');}catch(e){cont.innerHTML='<div style="color:var(--red)">Error al cargar</div>';}
+    const r=await authFetch(API+'/admin/usuarios');
+    const users=await r.json();
+    if(!users.length){container.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">Sin clientes</div>';return;}
+    container.innerHTML=users.map(u=>{
+      const estado=!u.activo?'badge-red':u.expira_en_dias<=0?'badge-yellow':u.expira_en_dias<=5?'badge-yellow':'badge-green';
+      const estadoTxt=!u.activo?'Suspendido':u.expira_en_dias<=0?'Expirado':u.expira_en_dias<=5?'Por vencer':'Activo';
+      return`<div class="client-card"><div class="client-card-header"><div class="client-name">${u.usuario}</div><span class="badge ${estado}">${estadoTxt}</span></div><div style="font-size:12px;color:var(--muted);margin-bottom:4px">📦 ${u.paquete} · ${u.conexiones_activas}/${u.max_conexiones} conn</div><div style="font-size:12px;color:var(--muted)">📅 ${u.expira_en_dias>0?'Vence en '+u.expira_en_dias+' días':'Expirado'}</div>${u.notas?`<div style="font-size:12px;color:var(--wa);margin-top:4px">📱 ${u.notas}</div>`:''}<div class="client-footer"><button class="btn btn-sm" style="background:rgba(16,185,129,.15);color:var(--green);border:1px solid rgba(16,185,129,.2)" onclick="verPagos(${u.id},'${u.usuario}')">💰</button><button class="btn btn-sm" style="background:rgba(59,130,246,.15);color:var(--accent);border:1px solid rgba(59,130,246,.2)" onclick="verLogsUsuario(${u.id},'${u.usuario}')">📋</button><button class="btn btn-sm" style="background:rgba(37,211,102,.15);color:var(--wa);border:1px solid rgba(37,211,102,.2)" onclick="sendWA('${u.notas}','${u.usuario}')">💬</button><button class="btn btn-warn btn-sm" onclick="renovar(${u.id})">↺</button></div></div>`;
+    }).join('');
+  }catch(e){container.innerHTML='<div style="color:var(--red);text-align:center;padding:40px">Error al cargar</div>';}
 }
 
-async function renovar(uid){const dias=prompt('¿Días a agregar?','30');if(!dias)return;const r=await authFetch(API+`/admin/usuarios/${uid}/renovar`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dias})});const d=await r.json();alert(`✅ Renovado hasta: ${new Date(d.expira).toLocaleDateString('es-CO')}`);cargarUsuarios();}
-async function suspender(uid){await authFetch(API+`/admin/usuarios/${uid}/suspender`,{method:'POST'});cargarUsuarios();}
-async function eliminar(uid,nombre){if(!confirm(`¿Eliminar "${nombre}"?`))return;await authFetch(API+`/admin/usuarios/${uid}`,{method:'DELETE'});cargarUsuarios();}
-async function resetPass(uid,nombre){if(!confirm(`¿Resetear contraseña de "${nombre}"?`))return;const r=await authFetch(API+`/admin/usuarios/${uid}/reset-password`,{method:'POST'});const d=await r.json();if(!r.ok){alert('Error');return;}lastCreds={...d,paquete:''};mostrarCreds(d,'🔑 Contraseña reseteada');}
+function sendWA(phone,nombre){
+  if(!phone){toast('El cliente no tiene WhatsApp registrado','error');return;}
+  const msg=encodeURIComponent('Hola '+nombre+', te escribo de StreamFlow IPTV. ¿Cómo estás disfrutando del servicio? 😊');
+  window.open('https://wa.me/'+phone.replace(/[^0-9]/g,'')+'?text='+msg,'_blank');
+}
 
-  async function checkWaStatus() {
-    try {
-      const r = await authFetch(API+ '/admin/wa/status');
-      const d = await r.json();
-      const badge = document.getElementById('wa-badge');
-      if (d.ready) {
-        badge.className = 'badge badge-green';
-        badge.textContent = '🟢 Conectado';
-      } else if (d.hasQr) {
-        badge.className = 'badge badge-yellow';
-        badge.textContent = '🟡 Esperando QR';
-      } else {
-        badge.className = 'badge badge-red';
-        badge.textContent = '⚫ Desconectado';
-      }
-    } catch(e) {
-      document.getElementById('wa-badge').textContent = '❌ Error de conexión';
+// ════════════════════════════════════════════════════════════════
+// LOGS
+// ════════════════════════════════════════════════════════════════
+
+async function cargarLogs(){
+  const container=document.getElementById('lista-logs');
+  try{
+    const r=await authFetch(API+'/admin/logs?limit=50');
+    const logs=await r.json();
+    if(!logs.length){container.innerHTML='<div style="padding:32px;text-align:center;color:var(--muted)">Sin logs</div>';return;}
+    container.innerHTML=logs.map((l,i)=>`<div class="log-item"><span style="flex:0 0 24px;color:var(--muted);font-size:11px">${i+1}</span><span style="min-width:90px;font-weight:600">${l.usuario||'—'}</span><span style="flex:1;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${l.canal||'—'}</span><span style="min-width:110px;font-size:11px;color:var(--muted)">${l.ip||'—'}</span><span style="min-width:130px;font-size:11px;color:var(--muted);text-align:right">${new Date(l.fecha).toLocaleString('es-CO')}</span></div>`).join('');
+  }catch(e){container.innerHTML='<div style="padding:32px;text-align:center;color:var(--red)">Error</div>';}
+}
+
+// ════════════════════════════════════════════════════════════════
+// WHATSAPP
+// ════════════════════════════════════════════════════════════════
+
+async function checkWaStatus(){
+  try{
+    const r=await authFetch(API+'/admin/wa/status');
+    const d=await r.json();
+    const badge=document.getElementById('wa-badge');
+    if(d.connected){badge.className='badge badge-green';badge.textContent='🟢 Conectado';}
+    else{badge.className='badge badge-red';badge.textContent='⚫ Desconectado';}
+    document.getElementById('status-wa').textContent='💬 WhatsApp: '+(d.connected?'Conectado':'Desconectado');
+  }catch(e){}
+}
+
+async function notificarVencimiento(){
+  const dias=parseInt(document.getElementById('wa-dias-aviso').value);
+  const r=await authFetch(API+'/admin/wa/notify-expiring',{method:'POST',body:JSON.stringify({dias})});
+  const d=await r.json();
+  document.getElementById('wa-notify-result').innerHTML=d.ok?`<div style="color:var(--green);font-size:13px">✅ ${d.enviados} de ${d.total} avisos enviados</div>`:`<div style="color:var(--red);font-size:13px">❌ ${d.error||'Error'}</div>`;
+}
+
+async function enviarMensajeManual(){
+  const phone=document.getElementById('wa-phone').value.trim();
+  const msg=document.getElementById('wa-msg').value.trim();
+  if(!phone||!msg){toast('Completa número y mensaje','error');return;}
+  const r=await authFetch(API+'/admin/wa/send',{method:'POST',body:JSON.stringify({phone,message:msg})});
+  const d=await r.json();
+  document.getElementById('wa-send-result').innerHTML=d.ok?`<div style="color:var(--green);font-size:13px">✅ Mensaje enviado</div>`:`<div style="color:var(--red);font-size:13px">❌ ${d.error||'Error'}</div>`;
+  if(d.ok){document.getElementById('wa-phone').value='';document.getElementById('wa-msg').value='';}
+}
+
+// ════════════════════════════════════════════════════════════════
+// CANALES
+// ════════════════════════════════════════════════════════════════
+
+function showCanalTab(tab,btn){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-proveedor').style.display=tab==='proveedor'?'block':'none';
+  document.getElementById('tab-canales').style.display=tab==='canales'?'block':'none';
+  document.getElementById('tab-backup').style.display=tab==='backup'?'block':'none';
+  if(tab==='canales')loadAllChannels();
+  if(tab==='proveedor')loadProviderStats();
+}
+
+async function loadProviderStats(){
+  try{
+    const r=await authFetch(API+'/admin/channels/stats');
+    const d=await r.json();
+    let html=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px">`;
+    html+=`<div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--accent)">${d.total_canales||0}</div><div style="font-size:11px;color:var(--muted)">Canales</div></div>`;
+    html+=`<div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--green)">${d.fuentes_premium||0}</div><div style="font-size:11px;color:var(--muted)">Premium</div></div>`;
+    html+=`<div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--yellow)">${d.fuentes_gratis||0}</div><div style="font-size:11px;color:var(--muted)">Backup</div></div>`;
+    html+=`<div style="background:var(--bg);border-radius:10px;padding:12px;text-align:center"><div style="font-size:20px;font-weight:700;color:var(--red)">${d.canales_caidos||0}</div><div style="font-size:11px;color:var(--muted)">Caídos</div></div>`;
+    html+=`</div>`;
+    if(d.proveedores){
+      html+=`<div style="font-size:12px;color:var(--muted)">Proveedores activos: `;
+      html+=Object.entries(d.proveedores).map(([p,c])=>`<span class="badge badge-blue" style="margin-right:4px">${p}: ${c}</span>`).join('');
+      html+=`</div>`;
     }
+    document.getElementById('provider-current').innerHTML=html;
+  }catch(e){
+    document.getElementById('provider-current').innerHTML='<div style="color:var(--muted)">Sin datos</div>';
   }
+}
 
-  async function notificarVencimiento() {
-    const dias = document.getElementById('wa-dias-aviso').value;
-    const res = document.getElementById('wa-notify-result');
-    res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
-    try {
-      const r = await authFetch(API+ '/admin/wa/notify-expiring', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({dias})
-      });
-      const d = await r.json();
-      if (d.ok) {
-        res.innerHTML = `<span style="color:var(--green)">✅ Enviados: ${d.enviados} de ${d.total} clientes con WhatsApp</span>`;
-      } else {
-        res.innerHTML = `<span style="color:var(--red)">❌ ${d.error || 'Error al enviar'}</span>`;
-      }
-    } catch(e) { res.innerHTML = '<span style="color:var(--red)">❌ Error de conexión</span>'; }
-  }
-
-  async function enviarMensajeManual() {
-    const phone = document.getElementById('wa-phone').value.trim();
-    const message = document.getElementById('wa-msg').value.trim();
-    const res = document.getElementById('wa-send-result');
-    if (!phone || !message) { alert('Completa el número y el mensaje'); return; }
-    res.innerHTML = '<span style="color:var(--muted)">Enviando...</span>';
-    try {
-      const r = await authFetch(API+ '/admin/wa/send', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({phone, message})
-      });
-      const d = await r.json();
-      if (d.ok) {
-        res.innerHTML = '<span style="color:var(--green)">✅ Mensaje enviado</span>';
-        document.getElementById('wa-msg').value = '';
-      } else {
-        res.innerHTML = `<span style="color:var(--red)">❌ ${d.error || 'No se pudo enviar. ¿WhatsApp conectado?'}</span>`;
-      }
-    } catch(e) { res.innerHTML = '<span style="color:var(--red)">❌ Error</span>'; }
-  }
-
-  let _categorias = [];
-  let _editandoPaquete = null;
-  let _nuevoPaqueteNombre = '';
-
-  async function cargarPaquetes() {
-    const [rP, rC] = await Promise.all([
-      authFetch(API+ '/admin/paquetes'),
-      authFetch(API+ '/admin/categorias-proveedor')
-    ]);
-    const paquetes = await rP.json();
-    _categorias = await rC.json();
-
-    const lista = document.getElementById('paquetes-lista');
-    if (!paquetes.length) {
-      lista.innerHTML = '<p style="color:var(--muted);font-size:13px">Sin paquetes</p>';
-      return;
+async function loadProvider(){
+  const url=document.getElementById('prov-url').value.trim();
+  const nombre=document.getElementById('prov-nombre').value.trim()||'proveedor';
+  if(!url){toast('Escribe la URL del proveedor','error');return;}
+  document.getElementById('load-result').innerHTML='<div class="loading"><div class="spinner"></div>Cargando canales...</div>';
+  try{
+    const r=await authFetch(API+'/admin/channels/load-provider',{method:'POST',body:JSON.stringify({url,nombre})});
+    const d=await r.json();
+    if(d.ok){
+      document.getElementById('load-result').innerHTML=`<div style="color:var(--green)">✅ Cargados: ${d.nuevos} nuevos, ${d.vinculados} vinculados (${d.total} total)</div>`;
+      toast('Proveedor cargado: '+d.total+' canales','success');
+      loadProviderStats();
+    }else{
+      document.getElementById('load-result').innerHTML=`<div style="color:var(--red)">❌ ${d.error}</div>`;
+      toast(d.error,'error');
     }
-    lista.innerHTML = paquetes.map(p => {
-      const cats = p.categorias ? p.categorias.split(',').length : 0;
-      return `<div style="background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px">
-        <div style="font-weight:700;font-size:15px;margin-bottom:4px">${p.nombre}</div>
-        <div style="font-size:12px;color:var(--muted);margin-bottom:10px">${p.descripcion || 'Sin descripción'}</div>
-        <div style="font-size:12px;color:var(--accent);margin-bottom:12px">${cats} categorías</div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-ghost btn-sm" onclick="editarPaquete(${p.id},'${p.nombre}','${p.descripcion}','${p.categorias}')">✏️ Editar</button>
-          <button class="btn btn-danger btn-sm" onclick="eliminarPaquete(${p.id},'${p.nombre}')">✕</button>
+  }catch(e){
+    document.getElementById('load-result').innerHTML=`<div style="color:var(--red)">❌ Error de conexión</div>`;
+  }
+}
+
+async function changeProvider(){
+  const anterior=document.getElementById('prov-anterior').value;
+  const url=document.getElementById('prov-nueva-url').value.trim();
+  const nombre=document.getElementById('prov-nuevo-nombre').value.trim()||'proveedor';
+  if(!url){toast('Escribe la URL del nuevo proveedor','error');return;}
+  if(!confirm('¿Cambiar de proveedor? Las URLs del proveedor anterior se desactivarán.'))return;
+  document.getElementById('change-result').innerHTML='<div class="loading"><div class="spinner"></div>Cambiando proveedor...</div>';
+  try{
+    const r=await authFetch(API+'/admin/channels/change-provider',{method:'POST',body:JSON.stringify({proveedor_anterior:anterior,proveedor_nuevo:nombre,url_nueva:url})});
+    const d=await r.json();
+    if(d.ok){
+      document.getElementById('change-result').innerHTML=`<div style="color:var(--green)">✅ Cambio completado: ${d.fuentes_desactivadas} desactivadas, ${d.canales_vinculados} vinculados, ${d.canales_sin_fuente} sin fuente</div>`;
+      toast('Proveedor cambiado exitosamente','success');
+      loadProviderStats();
+    }else{
+      document.getElementById('change-result').innerHTML=`<div style="color:var(--red)">❌ ${d.error}</div>`;
+    }
+  }catch(e){
+    document.getElementById('change-result').innerHTML=`<div style="color:var(--red)">❌ Error</div>`;
+  }
+}
+
+async function loadAllChannels(){
+  const container=document.getElementById('canal-list');
+  container.innerHTML='<div class="loading"><div class="spinner"></div>Cargando canales...</div>';
+  try{
+    const r=await authFetch(API+'/admin/channels?limit=200');
+    const d=await r.json();
+    allChannels=d.canales||[];
+    document.getElementById('canal-count').textContent=allChannels.length;
+    // Llenar filtro de grupos
+    const grupos=d.groups||[];
+    const sel=document.getElementById('canal-filter-grupo');
+    sel.innerHTML='<option value="">Todos los grupos</option>'+grupos.map(g=>`<option value="${g}">${g}</option>`).join('');
+    renderChannels(allChannels);
+  }catch(e){
+    container.innerHTML='<div style="color:var(--red);text-align:center;padding:40px">Error al cargar</div>';
+  }
+}
+
+function renderChannels(channels){
+  const container=document.getElementById('canal-list');
+  if(!channels.length){container.innerHTML='<div style="color:var(--muted);text-align:center;padding:40px">Sin canales</div>';return;}
+  container.innerHTML=channels.map(ch=>{
+    const estado=ch.fuente_estado||'sin_fuente';
+    const estadoClass=estado==='ok'?'badge-green':estado==='caido'?'badge-red':'badge-yellow';
+    const estadoTxt=estado==='ok'?'✅':estado==='caido'?'⚠️ Caído':'❌ Sin fuente';
+    const fuentes=(ch.fuentes_count||0);
+    return`<div class="channel-card">
+      <div class="channel-logo">${ch.grupo?ch.grupo[0]:'📺'}</div>
+      <div class="channel-info">
+        <div class="channel-name">${ch.display_name||ch.nombre}</div>
+        <div class="channel-group">${ch.grupo||'Sin grupo'}</div>
+        <div class="channel-sources">
+          <span class="source-badge ${ch.fuente_proveedor==='gratuito'?'source-free':'source-premium'}">${ch.fuente_proveedor||'N/A'}</span>
+          ${fuentes>1?`<span class="source-badge source-free">+${fuentes-1} fuentes</span>`:''}
         </div>
-      </div>`;
-    }).join('');
-  }
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end">
+        <span class="badge ${estadoClass}" style="font-size:10px">${estadoTxt}</span>
+        <button class="btn btn-ghost btn-sm" onclick="verFuentes('${ch.canal_id}','${(ch.display_name||ch.nombre).replace(/'/g,"\\'")}')">📡</button>
+      </div>
+    </div>`;
+  }).join('');
+}
 
-  function mostrarNuevoPaquete() {
-    _editandoPaquete = null;
-    _nuevoPaqueteNombre = prompt('Nombre del paquete (ej: basico, premium):');
-    if (!_nuevoPaqueteNombre) return;
-    mostrarCategorias([], _nuevoPaqueteNombre + ' — nuevo paquete');
-  }
+function filterChannels(){
+  const search=document.getElementById('canal-search').value.toLowerCase();
+  const grupo=document.getElementById('canal-filter-grupo').value;
+  const estado=document.getElementById('canal-filter-estado').value;
+  let filtered=allChannels;
+  if(search)filtered=filtered.filter(c=>(c.display_name||c.nombre||'').toLowerCase().includes(search)||(c.canal_id||'').toLowerCase().includes(search));
+  if(grupo)filtered=filtered.filter(c=>(c.grupo||'').toLowerCase().includes(grupo.toLowerCase()));
+  if(estado)filtered=filtered.filter(c=>(c.fuente_estado||'sin_fuente')===estado);
+  renderChannels(filtered);
+}
 
-  function editarPaquete(id, nombre, desc, cats) {
-    _editandoPaquete = { id, nombre, desc };
-    const seleccionadas = cats ? cats.split(',') : [];
-    mostrarCategorias(seleccionadas, 'Editando: ' + nombre);
-  }
+async function checkAllChannels(){
+  toast('Verificando canales...','info');
+  try{
+    const r=await authFetch(API+'/admin/channels/check-all',{method:'POST'});
+    const d=await r.json();
+    toast(`Verificación: ${d.results?.ok||0} OK, ${d.results?.reemplazado||0} reemplazados, ${d.results?.caido||0} caídos`,'success');
+    loadAllChannels();
+  }catch(e){toast('Error','error');}
+}
 
-  function mostrarCategorias(seleccionadas, titulo) {
-    document.getElementById('cat-titulo').textContent = titulo;
-    document.getElementById('card-categorias').style.display = 'block';
-    const lista = document.getElementById('cat-lista');
-    lista.innerHTML = _categorias.map(c => {
-      const checked = seleccionadas.includes(String(c.category_id)) ? 'checked' : '';
-      return `<label style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;cursor:pointer;font-size:13px">
-        <input type="checkbox" value="${c.category_id}" ${checked} style="width:16px;height:16px;cursor:pointer">
-        <span>${c.category_name}</span>
-      </label>`;
-    }).join('');
-    document.getElementById('card-categorias').scrollIntoView({behavior:'smooth'});
-  }
-
-  async function guardarPaquete() {
-    const checks = document.querySelectorAll('#cat-lista input[type=checkbox]:checked');
-    const cats = Array.from(checks).map(c => c.value).join(',');
-
-    if (_editandoPaquete) {
-      await authFetch(API+ `/admin/paquetes/${_editandoPaquete.id}`, {
-        method: 'PUT', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({categorias: cats})
-      });
-    } else {
-      const desc = prompt('Descripción del paquete:', '');
-      await authFetch(API+ '/admin/paquetes', {
-        method: 'POST', headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({nombre: _nuevoPaqueteNombre, descripcion: desc || '', categorias: cats})
-      });
+async function verFuentes(canalId,nombre){
+  currentCanalId=canalId;
+  document.getElementById('fuentes-nombre').textContent=nombre;
+  try{
+    const r=await authFetch(API+'/admin/channels/'+canalId+'/sources');
+    const d=await r.json();
+    const lista=document.getElementById('lista-fuentes');
+    if(!d.fuentes||!d.fuentes.length){lista.innerHTML='<div style="color:var(--muted);text-align:center;padding:16px">Sin fuentes</div>';}
+    else{
+      lista.innerHTML=d.fuentes.map(f=>{
+        const estadoClass=f.estado==='ok'?'badge-green':f.estado==='caido'?'badge-red':'badge-yellow';
+        return`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+          <div><div style="font-size:12px;font-weight:600">${f.proveedor}</div><div style="font-size:10px;color:var(--muted);word-break:break-all">${f.url.substring(0,60)}...</div></div>
+          <div style="display:flex;gap:4px;align-items:center"><span class="badge ${estadoClass}" style="font-size:10px">${f.estado}</span><button class="btn btn-danger btn-sm" onclick="removeFuente(${f.id})">✕</button></div>
+        </div>`;
+      }).join('');
     }
-    document.getElementById('card-categorias').style.display = 'none';
-    await cargarPaquetes();
-  }
+    document.getElementById('modal-fuentes').classList.add('open');
+  }catch(e){toast('Error','error');}
+}
 
-  function cancelarPaquete() {
-    document.getElementById('card-categorias').style.display = 'none';
-  }
+async function addFuente(){
+  const url=document.getElementById('fuente-url').value.trim();
+  const proveedor=document.getElementById('fuente-proveedor').value.trim()||'manual';
+  if(!url){toast('Escribe la URL','error');return;}
+  try{
+    const r=await authFetch(API+'/admin/channels/'+currentCanalId+'/sources',{method:'POST',body:JSON.stringify({url,proveedor,prioridad:2})});
+    if(r.ok){toast('Fuente agregada','success');verFuentes(currentCanalId,document.getElementById('fuentes-nombre').textContent);document.getElementById('fuente-url').value='';}
+    else toast('Error','error');
+  }catch(e){toast('Error','error');}
+}
 
-  async function eliminarPaquete(id, nombre) {
-    if (!confirm(`¿Eliminar el paquete "${nombre}"?`)) return;
-    await authFetch(API+ `/admin/paquetes/${id}`, {method:'DELETE'});
-    await cargarPaquetes();
-  }
+async function removeFuente(fuenteId){
+  if(!confirm('¿Desactivar esta fuente?'))return;
+  try{
+    const r=await authFetch(API+'/admin/channels/'+currentCanalId+'/sources/'+fuenteId,{method:'DELETE'});
+    if(r.ok){toast('Fuente desactivada','success');verFuentes(currentCanalId,document.getElementById('fuentes-nombre').textContent);}
+  }catch(e){toast('Error','error');}
+}
 
-  // Verificar autenticación
-  if (!localStorage.getItem('sf_token')) {
-    window.location.href = '/panel/login';
+async function loadFreeChannels(){
+  const urls=document.getElementById('free-urls').value.split('\n').map(u=>u.trim()).filter(u=>u);
+  if(!urls.length){toast('Escribe al menos una URL','error');return;}
+  document.getElementById('free-result').innerHTML='<div class="loading"><div class="spinner"></div>Cargando...</div>';
+  try{
+    const r=await authFetch(API+'/admin/channels/load-free',{method:'POST',body:JSON.stringify({urls})});
+    const d=await r.json();
+    if(d.ok){
+      document.getElementById('free-result').innerHTML=`<div style="color:var(--green)">✅ ${d.nuevos} nuevos, ${d.vinculados} vinculados</div>`;
+      toast('Backups cargados','success');
+    }else{
+      document.getElementById('free-result').innerHTML=`<div style="color:var(--red)">❌ ${d.error}</div>`;
+    }
+  }catch(e){
+    document.getElementById('free-result').innerHTML=`<div style="color:var(--red)">❌ Error</div>`;
   }
+}
 
+// ════════════════════════════════════════════════════════════════
+// PAQUETES
+// ════════════════════════════════════════════════════════════════
+
+let editingPaqueteId = null;
+
+async function cargarPaquetes(){
+  try{
+    const r=await authFetch(API+'/admin/paquetes');
+    const paquetes=await r.json();
+    const container=document.getElementById('paquetes-lista');
+    if(!paquetes.length){container.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px">Sin paquetes</div>';return;}
+    container.innerHTML=paquetes.map(p=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="font-weight:700;font-size:16px;margin-bottom:4px">${p.nombre}</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:8px">${p.descripcion||'Sin descripción'}</div>
+      <div style="font-size:11px;color:var(--muted)">Categorías: ${p.categorias||'Todas'}</div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn btn-ghost btn-sm" onclick="editarPaquete(${p.id},'${p.nombre}','${(p.descripcion||'').replace(/'/g,"\\'")}')">✏️ Editar</button>
+        <button class="btn btn-danger btn-sm" onclick="eliminarPaquete(${p.id},'${p.nombre}')">🗑️</button>
+      </div>
+    </div>`).join('');
+  }catch(e){}
+}
+
+function mostrarNuevoPaquete(){
+  editingPaqueteId=null;
+  document.getElementById('cat-titulo').textContent='Nuevo paquete';
+  document.getElementById('card-categorias').style.display='block';
+  cargarCategoriasPaquete();
+}
+
+function editarPaquete(id,nombre,desc){
+  editingPaqueteId=id;
+  document.getElementById('cat-titulo').textContent='Editar: '+nombre;
+  document.getElementById('card-categorias').style.display='block';
+  cargarCategoriasPaquete();
+}
+
+async function cargarCategoriasPaquete(){
+  try{
+    const r=await authFetch(API+'/admin/channels?limit=500');
+    const d=await r.json();
+    const grupos={};
+    (d.canales||[]).forEach(c=>{if(c.grupo)grupos[c.grupo]=(grupos[c.grupo]||0)+1;});
+    const container=document.getElementById('cat-lista');
+    container.innerHTML=Object.entries(grupos).sort((a,b)=>b[1]-a[1]).map(([g,c])=>`<label style="display:flex;align-items:center;gap:8px;padding:8px;background:var(--bg);border-radius:8px;cursor:pointer"><input type="checkbox" value="${g}" style="width:auto"> <span style="font-size:13px">${g}</span> <span style="font-size:11px;color:var(--muted)">(${c})</span></label>`).join('');
+  }catch(e){}
+}
+
+async function guardarPaquete(){
+  const nombre=prompt('Nombre del paquete:');
+  if(!nombre)return;
+  const desc=prompt('Descripción:')||'';
+  const checks=document.querySelectorAll('#cat-lista input:checked');
+  const categorias=Array.from(checks).map(c=>c.value);
+  try{
+    const r=await authFetch(API+'/admin/paquetes',{method:'POST',body:JSON.stringify({nombre,descripcion:desc,categorias:categorias.join(',')})});
+    if(r.ok){toast('Paquete guardado','success');cargarPaquetes();document.getElementById('card-categorias').style.display='none';}
+    else toast('Error','error');
+  }catch(e){toast('Error','error');}
+}
+
+async function cancelarPaquete(){
+  document.getElementById('card-categorias').style.display='none';
+}
+
+async function eliminarPaquete(id,nombre){
+  if(!confirm('¿Eliminar paquete "'+nombre+'"?'))return;
+  const r=await authFetch(API+'/admin/paquetes/'+id,{method:'DELETE'});
+  if(r.ok){toast('Paquete eliminado','success');cargarPaquetes();}
+}
+
+// ════════════════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════════════════
+
+document.addEventListener('DOMContentLoaded',()=>{
+  const token=localStorage.getItem('sf_token');
+  if(!token){window.location.href='/panel/login';return;}
   cargarStats();
+});
 </script>
 </body>
 </html>
