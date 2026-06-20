@@ -33,7 +33,7 @@ const CONFIG = {
     APP_DIR: process.env.APP_DIR || '/root/streamflow',
     ADMIN_USER: process.env.ADMIN_USER || 'admin',
     ADMIN_PASS: process.env.ADMIN_PASS || 'admin123',
-    ADMIN_PHONE: process.env.ADMIN_PHONE || '',
+    ADMIN_PHONE: process.env.ADMIN_PHONE || '573222468509',
     
     // Intervalos (minutos)
     HEALTH_CHECK_INTERVAL: 5,
@@ -137,6 +137,30 @@ function initWhatsApp() {
     });
 
     waClient.on('message', handleWhatsAppCommand);
+    
+    // Mensajes de clientes → reenviar a Luna (OWL)
+    waClient.on('message', async (msg) => {
+        // Solo mensajes que NO son del admin
+        if (msg.from && msg.from !== `${CONFIG.ADMIN_PHONE}@c.us` && !msg.from.includes('@g.us')) {
+            // Guardar en cola para que Luna lo procese
+            try {
+                const fs = require('fs');
+                const queueFile = '/tmp/luna-whatsapp-queue.json';
+                let queue = [];
+                if (fs.existsSync(queueFile)) {
+                    queue = JSON.parse(fs.readFileSync(queueFile, 'utf-8'));
+                }
+                queue.push({
+                    from: msg.from,
+                    body: msg.body,
+                    timestamp: new Date().toISOString(),
+                    phone: msg.from.replace('@c.us', ''),
+                });
+                fs.writeFileSync(queueFile, JSON.stringify(queue.slice(-50)));
+            } catch (e) {}
+        }
+    });
+    
     waClient.initialize();
 }
 
