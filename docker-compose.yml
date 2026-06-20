@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  streamflow:
+    image: easypanel/luna/streamflow:latest
+    container_name: luna_streamflow
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - DATABASE_URL=postgres://postgres:***@luna_streamflow-db:5432/luna?sslmode=disable
+      - SECRET_KEY=***      - JWT_SECRET=***      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=***      - URL_M3U=http://red4tv.lat:80/get.php?username=UgDwgnxyFY&password=RZK22tgr7v&type=m3u_plus&output=ts
+      - VLC_HTTP_PORT=8888
+      - VLC_HTTP_USER=streamflow
+      - VLC_HTTP_PASS=***
+      - VLC_TIMEOUT=60
+      - VLC_MAX_CHANNELS=8
+      - ALLOWED_ORIGINS=https://luna-streamflow.sbpm5z.easypanel.host
+    depends_on:
+      - db
+    networks:
+      - easypanel
+
+  db:
+    image: postgres:17
+    container_name: luna_streamflow-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=***
+      - POSTGRES_DB=luna
+    volumes:
+      - streamflow_pgdata:/var/lib/postgresql/data
+    networks:
+      - easypanel
+
+volumes:
+  streamflow_pgdata:
+
+networks:
+  easypanel:
+    external: true
