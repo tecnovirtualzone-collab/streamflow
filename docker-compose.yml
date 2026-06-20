@@ -8,9 +8,13 @@ services:
     ports:
       - "5000:5000"
     environment:
-      - DATABASE_URL=postgres://postgres:***@luna_streamflow-db:5432/luna?sslmode=disable
-      - SECRET_KEY=***      - JWT_SECRET=***      - ADMIN_USER=admin
-      - ADMIN_PASSWORD=***      - URL_M3U=http://red4tv.lat:80/get.php?username=UgDwgnxyFY&password=RZK22tgr7v&type=m3u_plus&output=ts
+      - DATABASE_URL=postgresql://postgres@luna_streamflow-db:5432/luna
+      - PGPASSWORD=gs0o43tvs82yl0gfh5nl
+      - SECRET_KEY=***
+      - JWT_SECRET=***
+      - ADMIN_USER=admin
+      - ADMIN_PASSWORD=***
+      - URL_M3U=http://red4tv.lat:80/get.php?username=UgDwgnxyFY&password=RZK22tgr7v&type=m3u_plus&output=ts
       - VLC_HTTP_PORT=8888
       - VLC_HTTP_USER=streamflow
       - VLC_HTTP_PASS=***

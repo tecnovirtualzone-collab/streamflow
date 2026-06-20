@@ -90,11 +90,22 @@ ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH", "")
 
 # Base de datos
 _db_url = os.environ.get(
-        "DATABASE_URL", "postgresql://postgres:postgres@luna_streamflow-db/luna"
+        "DATABASE_URL", "postgresql://postgres:***@luna_streamflow-db/luna"
     )
 # SQLAlchemy 2.x requiere postgresql:// no postgres://
 if _db_url.startswith("postgres://"):
     _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+# Si PGPASSWORD está seteado, reconstruir URL sin contraseña (psycopg2 la lee de PGPASSWORD)
+_pg_pass = os.environ.get("PGPASSWORD", "")
+if _pg_pass and "@" in _db_url:
+    # Extraer user y host/db, reconstruir sin contraseña en URL
+    from urllib.parse import urlparse, urlunparse
+    parsed = urlparse(_db_url)
+    # Reconstruct: scheme://user@host/db?params
+    netloc = f"{parsed.username}@{parsed.hostname}"
+    if parsed.port:
+        netloc += f":{parsed.port}"
+    _db_url = urlunparse((parsed.scheme, netloc, parsed.path, parsed.params, parsed.query, parsed.fragment))
 app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
