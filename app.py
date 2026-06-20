@@ -89,9 +89,13 @@ ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH", "")
 
 # Base de datos
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-        "DATABASE_URL", "postgresql://postgres:***@luna_streamflow-db/luna"
+_db_url = os.environ.get(
+        "DATABASE_URL", "postgresql://postgres:postgres@luna_streamflow-db/luna"
     )
+# SQLAlchemy 2.x requiere postgresql:// no postgres://
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+app.config["SQLALCHEMY_DATABASE_URI"] = _db_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 # Proveedor IPTV (cuentas premium)
