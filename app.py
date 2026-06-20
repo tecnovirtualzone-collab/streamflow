@@ -90,7 +90,7 @@ ADMIN_PASS_HASH = os.environ.get("ADMIN_PASS_HASH", "")
 
 # Base de datos
 app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get(
-        "DATABASE_URL", "postgresql://postgres:postgres@luna_streamflow-db/luna"
+        "DATABASE_URL", "postgresql://postgres:***@luna_streamflow-db/luna"
     )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
