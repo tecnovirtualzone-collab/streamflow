@@ -1,0 +1,19 @@
+{
+  "name": "streamflow-guardian",
+  "version": "1.0.0",
+  "description": "Agente autónomo que monitorea StreamFlow 24/7 y envía alertas por WhatsApp",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "whatsapp-web.js": "^1.23.0",
+    "node-cron": "^3.0.3",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

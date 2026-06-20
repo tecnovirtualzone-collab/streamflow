@@ -1515,6 +1515,16 @@ def categorias_proveedor():
         return jsonify([])
 
 
+@app.route("/health")
+def health_check():
+    """Health check para Guardian Agent. No requiere auth."""
+    try:
+        CanalLogico.query.count()
+        return jsonify({"status": "ok", "timestamp": datetime.utcnow().isoformat()}), 200
+    except:
+        return jsonify({"status": "error"}), 503
+
+
 @app.route("/admin/stats")
 @admin_required
 def stats():
