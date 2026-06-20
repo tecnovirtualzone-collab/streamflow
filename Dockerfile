@@ -22,7 +22,8 @@ WORKDIR /app
 
 # Python deps
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --force-reinstall -r requirements.txt && \
+    python3 -c "import psycopg2; print('psycopg2 OK')"
 
 # Node deps
 COPY wa-service/package*.json ./wa-service/
