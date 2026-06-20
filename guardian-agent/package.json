@@ -1,7 +1,7 @@
 {
   "name": "streamflow-guardian",
-  "version": "1.0.0",
-  "description": "Agente autónomo que monitorea StreamFlow 24/7 y envía alertas por WhatsApp",
+  "version": "2.0.0",
+  "description": "Agente autónomo ADMIN que monitorea StreamFlow 24/7 - logs, deploys, canales, vencimientos, WhatsApp",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
