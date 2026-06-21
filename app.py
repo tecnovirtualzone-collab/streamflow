@@ -1702,6 +1702,17 @@ with app.app_context():
 
 
 # ════════════════════════════════════════════════════════════════
+# SERVIDOR HTTP (debe ir al final, después de definir todos los routes)
+# ════════════════════════════════════════════════════════════════
+
+if __name__ == "__main__":
+    _port = int(os.environ.get("PORT", "5000"))
+    _debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    logger.info(f"StreamFlow iniciando en puerto {_port} (debug={_debug})")
+    app.run(host="0.0.0.0", port=_port, debug=_debug, threaded=True)
+
+
+# ════════════════════════════════════════════════════════════════
 # APIs DE GESTIÓN DE CANALES (Panel Admin)
 # ════════════════════════════════════════════════════════════════
 
@@ -2618,6 +2629,3 @@ def series_stream(usuario, contrasena, episode_id):
                     headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
 
-# ════════════════════════════════════════════════════════════════
-# INICIALIZACIÓN
-# ════════════════════════════════════════════════════════════════
