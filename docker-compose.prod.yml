@@ -1,0 +1,16 @@
+services:
+  streamflow:
+    image: streamflow:v5
+    restart: unless-stopped
+    ports:
+      - "5003:5000"
+    environment:
+      - PORT=5000
+      - DATA_DIR=/data
+      - JWT_SECRET=streamflow-secret-key-2026
+      - INITIAL_ADMIN_PASSWORD=admin123
+      - BCRYPT_ROUNDS=10
+      - TZ=America/Bogota
+      - NODE_ENV=production
+    volumes:
+      - /data/streamflow-v5:/data
