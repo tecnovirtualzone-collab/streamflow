@@ -1664,8 +1664,26 @@ def panel_static(filename):
 # INICIALIZACIÓN
 # ════════════════════════════════════════════════════════════════
 
+# ── Conexión a BD con retry (espera a que la red overlay esté lista) ──
+_db_connected = False
+_db_retries = 0
+_max_db_retries = 30  # 30 intentos = ~60 segundos
+while not _db_connected and _db_retries < _max_db_retries:
+    try:
+        with app.app_context():
+            db.create_all()
+        _db_connected = True
+        logger.info(f"BD conectada después de {_db_retries + 1} intento(s)")
+    except Exception as e:
+        _db_retries += 1
+        logger.warning(f"BD no disponible (intento {_db_retries}/{_max_db_retries}): {e}")
+        time.sleep(2)
+
+if not _db_connected:
+    logger.error("No se pudo conectar a la BD después de 30 intentos. Abortando.")
+    sys.exit(1)
+
 with app.app_context():
-    db.create_all()
     if Paquete.query.count() == 0:
         for nombre, config in PAQUETES_DEFAULT.items():
             db.session.add(Paquete(
