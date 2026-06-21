@@ -1,8 +1,10 @@
 #!/bin/bash
-# Iniciar el servicio de WhatsApp en background
-cd /app/wa-service && node server.js &
-WA_PID=$!
-echo "🚀 WA Service iniciado (PID: $WA_PID)"
+# Iniciar el servicio de WhatsApp en background (si existe)
+if [ -d /app/wa-service ]; then
+    cd /app/wa-service && node server.js &
+    WA_PID=$!
+    echo "🚀 WA Service iniciado (PID: $WA_PID)"
+fi
 
-# Iniciar gunicorn (Python)
-cd /app && gunicorn --bind 0.0.0.0:5000 --worker-class gevent --workers 4 --worker-connections 1000 --timeout 300 app:app
+# Iniciar la app Python
+cd /app && python3 app.py
