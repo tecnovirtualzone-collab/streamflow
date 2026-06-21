@@ -2,7 +2,10 @@ version: "3.8"
 
 services:
   streamflow:
-    image: ${STREAMFLOW_IMAGE:-easypanel/luna/streamflow:latest}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${STREAMFLOW_IMAGE:-streamflow:latest}
     container_name: ${COMPOSE_PROJECT_NAME:-streamflow}_app
     restart: unless-stopped
     ports:
@@ -12,7 +15,7 @@ services:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-streamflow}
 
       # ── Seguridad ──
-      - SECRET_KEY=${SECRET_KEY:-change-this-to-random-string}
+      - SECRET_KEY=${SECRET_KEY:-change-this-to-random-string-at-least-32-chars}
       - JWT_SECRET=${JWT_SECRET:-change-this-to-another-random-string}
       - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
 
@@ -20,7 +23,7 @@ services:
       - ADMIN_USER=${ADMIN_USER:-admin}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-changeme}
 
-      # ── Proveedor IPTV (URL M3U completa con credenciales) ──
+      # ── Proveedor IPTV (URL M3U completa con credenciales incluidas) ──
       - URL_M3U=${URL_M3U:-}
 
       # ── VLC Relay ──
@@ -35,7 +38,7 @@ services:
       - SMART_ROTATION_INTERVAL=${SMART_ROTATION_INTERVAL:-30}
       - SMART_BUFFER_SECONDS=${SMART_BUFFER_SECONDS:-10}
 
-      # ── CORS ──
+      # ── CORS (dominio del cliente) ──
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-*}
 
       # ── Listas gratuitas (separadas por coma) ──
@@ -52,9 +55,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    volumes:
+      - streamflow_hls:/tmp/hls
 
   db:
-    image: ${POSTGRES_IMAGE:-postgres:17}
+    image: postgres:17-alpine
     container_name: ${COMPOSE_PROJECT_NAME:-streamflow}_db
     restart: unless-stopped
     environment:
@@ -66,7 +71,7 @@ services:
     networks:
       - streamflow_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-streamflow}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -74,6 +79,7 @@ services:
 
 volumes:
   streamflow_pgdata:
+  streamflow_hls:
 
 networks:
   streamflow_net:
