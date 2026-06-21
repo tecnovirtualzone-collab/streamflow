@@ -94,16 +94,24 @@ export function setupStreamRoutes(app) {
 }
 
 export function setupChannelRoutes(app) {
-  // Get all channels
+  // Get all channels (paginated)
   app.get('/api/channels', authMiddleware, (req, res) => {
+    const page = parseInt(req.query.page) || 1;
+    const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+    const offset = (page - 1) * limit;
+    
     const channels = db.prepare(`
       SELECT c.id, c.name, c.logo, c.group_name, p.name as provider_name
       FROM channels c
       JOIN providers p ON p.id = c.provider_id
       WHERE c.is_active = 1
       ORDER BY c.group_name, c.name
-    `).all();
-    res.json({ channels, count: channels.length });
+      LIMIT ? OFFSET ?
+    `).all(limit, offset);
+    
+    const total = db.prepare('SELECT COUNT(*) as count FROM channels WHERE is_active = 1').get().count;
+    
+    res.json({ channels, count: channels.length, total, page, totalPages: Math.ceil(total / limit) });
   });
 
   // Get channels grouped by category

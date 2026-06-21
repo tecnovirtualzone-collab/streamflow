@@ -9,6 +9,8 @@ import db, { runMigrations } from './database/db.js';
 import { createDefaultAdmin, setupAuthRoutes } from './controllers/authController.js';
 import { setupStreamRoutes, setupChannelRoutes, setupProviderRoutes } from './controllers/streamController.js';
 import { setupAdminRoutes } from './controllers/adminController.js';
+import { setupPlanRoutes } from './controllers/planController.js';
+import { setupWhatsAppRoutes } from './controllers/whatsappController.js';
 import streamManager from './services/streamManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,6 +38,8 @@ setupStreamRoutes(app);
 setupChannelRoutes(app);
 setupProviderRoutes(app);
 setupAdminRoutes(app);
+setupPlanRoutes(app);
+setupWhatsAppRoutes(app);
 
 // Serve admin panel
 app.use(express.static(path.join(__dirname, '..', 'public')));

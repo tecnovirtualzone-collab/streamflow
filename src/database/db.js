@@ -93,10 +93,57 @@ export function runMigrations() {
       updated_at INTEGER DEFAULT (strftime('%s','now'))
     );
 
+    CREATE TABLE IF NOT EXISTS plans (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      price_cop INTEGER DEFAULT 0,
+      max_channels INTEGER DEFAULT 40,
+      max_connections INTEGER DEFAULT 1,
+      is_active INTEGER DEFAULT 1,
+      created_at INTEGER DEFAULT (strftime('%s','now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS plan_channels (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      plan_id INTEGER NOT NULL,
+      channel_id INTEGER NOT NULL,
+      FOREIGN KEY (plan_id) REFERENCES plans(id),
+      FOREIGN KEY (channel_id) REFERENCES channels(id),
+      UNIQUE(plan_id, channel_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS whatsapp_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT UNIQUE NOT NULL,
+      qr_code TEXT DEFAULT '',
+      status TEXT DEFAULT 'disconnected',
+      phone TEXT DEFAULT '',
+      connected_at INTEGER DEFAULT 0,
+      last_seen INTEGER DEFAULT 0,
+      created_at INTEGER DEFAULT (strftime('%s','now'))
+    );
+
+    CREATE TABLE IF NOT EXISTS whatsapp_messages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id TEXT NOT NULL,
+      direction TEXT NOT NULL,
+      from_number TEXT DEFAULT '',
+      to_number TEXT DEFAULT '',
+      message TEXT DEFAULT '',
+      message_type TEXT DEFAULT 'text',
+      status TEXT DEFAULT 'pending',
+      created_at INTEGER DEFAULT (strftime('%s','now'))
+    );
+
     CREATE INDEX IF NOT EXISTS idx_channels_provider ON channels(provider_id);
     CREATE INDEX IF NOT EXISTS idx_streams_user ON current_streams(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
     CREATE INDEX IF NOT EXISTS idx_stats_channel ON stream_stats(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_plan_channels_plan ON plan_channels(plan_id);
+    CREATE INDEX IF NOT EXISTS idx_plan_channels_ch ON plan_channels(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_wa_session ON whatsapp_sessions(session_id);
+    CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
   `);
 
   // Default settings
@@ -106,7 +153,9 @@ export function runMigrations() {
     ['stream_buffer', '2'],
     ['max_connections', '3'],
     ['epg_enabled', '0'],
-    ['welcome_msg', 'Bienvenido a StreamFlow']
+    ['welcome_msg', 'Bienvenido a StreamFlow'],
+    ['whatsapp_enabled', '0'],
+    ['whatsapp_session_id', '']
   ];
   
   const insertSetting = db.prepare(
@@ -114,6 +163,16 @@ export function runMigrations() {
   );
   for (const [key, value] of defaultSettings) {
     insertSetting.run(key, value);
+  }
+
+  // Default plans
+  const existingPlans = db.prepare('SELECT COUNT(*) as count FROM plans').get();
+  if (existingPlans.count === 0) {
+    const insertPlan = db.prepare('INSERT INTO plans (name, description, price_cop, max_channels, max_connections) VALUES (?, ?, ?, ?, ?)');
+    insertPlan.run('Básico', 'Plan básico con canales esenciales', 10000, 40, 1);
+    insertPlan.run('Estándar', 'Plan estándar con más canales y contenido premium', 18000, 70, 2);
+    insertPlan.run('Premium', 'Plan premium con todos los canales disponibles', 25000, 100, 3);
+    console.log('✅ Default plans created');
   }
 
   console.log('✅ Database migrations completed');

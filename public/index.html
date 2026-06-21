@@ -18,15 +18,16 @@
     .login-error { color: #ff5252; text-align: center; margin-top: 12px; display: none; }
 
     .app-container { display: none; min-height: 100vh; }
-    .sidebar { position: fixed; left: 0; top: 0; width: 240px; height: 100vh; background: #1a1a2e; border-right: 1px solid #2a2a4a; padding: 20px 0; z-index: 100; }
+    .sidebar { position: fixed; left: 0; top: 0; width: 240px; height: 100vh; background: #1a1a2e; border-right: 1px solid #2a2a4a; padding: 20px 0; z-index: 100; overflow-y: auto; }
     .sidebar .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: #64ffda; border-bottom: 1px solid #2a2a4a; margin-bottom: 20px; }
     .sidebar .nav-item { padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px; }
     .sidebar .nav-item:hover, .sidebar .nav-item.active { background: #2a2a4a; }
     .sidebar .nav-item.active { border-left: 3px solid #64ffda; }
+    .sidebar .nav-section { padding: 8px 20px 4px; font-size: 11px; color: #666; text-transform: uppercase; letter-spacing: 1px; margin-top: 12px; }
     .sidebar .logout { position: absolute; bottom: 20px; width: 100%; padding: 12px 20px; cursor: pointer; color: #ff5252; }
 
     .main-content { margin-left: 240px; padding: 24px; }
-    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
     .page-header h2 { font-size: 24px; color: #fff; }
 
     .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
@@ -46,7 +47,9 @@
     .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
     .btn-primary { background: #64ffda; color: #0f0f1a; }
     .btn-danger { background: #ff5252; color: #fff; }
+    .btn-success { background: #2e7d32; color: #fff; }
     .btn-sm { padding: 6px 12px; font-size: 12px; }
+    .btn-whatsapp { background: #25d366; color: #fff; }
 
     .form-group { margin-bottom: 16px; }
     .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: #888; }
@@ -57,10 +60,11 @@
     .badge-success { background: #1b5e20; color: #64ffda; }
     .badge-warning { background: #e65100; color: #ffab40; }
     .badge-danger { background: #b71c1c; color: #ff5252; }
+    .badge-info { background: #0d47a1; color: #64b5f6; }
 
     .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
     .modal-overlay.active { display: flex; }
-    .modal { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+    .modal { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; width: 100%; max-width: 600px; max-height: 85vh; overflow-y: auto; }
     .modal h3 { margin-bottom: 16px; color: #64ffda; }
     .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 
@@ -77,6 +81,30 @@
 
     .page { display: none; }
     .page.active { display: block; }
+
+    /* WhatsApp QR */
+    .qr-container { text-align: center; padding: 20px; }
+    .qr-container img { max-width: 300px; border-radius: 12px; }
+    .qr-placeholder { width: 280px; height: 280px; background: #0f0f1a; border: 2px dashed #2a2a4a; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto; flex-direction: column; gap: 12px; }
+    .qr-loading { width: 40px; height: 40px; border: 3px solid #2a2a4a; border-top-color: #25d366; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .wa-status { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+    .wa-status-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .wa-connected { background: #25d366; }
+    .wa-disconnected { background: #ff5252; }
+    .wa-waiting { background: #ffab40; }
+
+    /* Plan builder */
+    .plan-channel-list { max-height: 300px; overflow-y: auto; border: 1px solid #2a2a4a; border-radius: 8px; padding: 8px; }
+    .plan-channel-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 4px; cursor: pointer; }
+    .plan-channel-item:hover { background: #2a2a4a; }
+    .plan-channel-item input { width: auto; }
+    .channel-count-badge { background: #64ffda; color: #0f0f1a; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; }
+    .cat-group-header { padding: 8px 0 4px; font-size: 12px; color: #64ffda; font-weight: 600; border-bottom: 1px solid #2a2a4a; margin-top: 8px; }
+
+    /* Price display */
+    .price-tag { font-size: 20px; font-weight: 700; color: #64ffda; }
+    .price-currency { font-size: 12px; color: #888; }
   </style>
 </head>
 <body>
@@ -95,11 +123,14 @@
   <div class="app-container" id="appContainer">
     <div class="sidebar">
       <div class="logo">🌙 StreamFlow</div>
-      <div class="nav-item active" onclick="showPage('dashboard')">📊 Dashboard</div>
-      <div class="nav-item" onclick="showPage('channels')">📺 Canales</div>
-      <div class="nav-item" onclick="showPage('providers')">🔗 Proveedores</div>
-      <div class="nav-item" onclick="showPage('users')">👥 Usuarios</div>
-      <div class="nav-item" onclick="showPage('streams')">📡 Streams Activos</div>
+      <div class="nav-item active" onclick="showPage('dashboard', this)">📊 Dashboard</div>
+      <div class="nav-item" onclick="showPage('channels', this)">📺 Canales</div>
+      <div class="nav-item" onclick="showPage('providers', this)">🔗 Proveedores</div>
+      <div class="nav-item" onclick="showPage('users', this)">👥 Usuarios</div>
+      <div class="nav-item" onclick="showPage('plans', this)">💰 Planes</div>
+      <div class="nav-item" onclick="showPage('streams', this)">📡 Streams</div>
+      <div class="nav-section">Comunicación</div>
+      <div class="nav-item" onclick="showPage('whatsapp', this)">📱 WhatsApp</div>
       <div class="logout" onclick="logout()">🚪 Cerrar Sesión</div>
     </div>
 
@@ -115,6 +146,7 @@
           <div class="stat-card"><div class="value" id="statChannels">0</div><div class="label">Canales</div></div>
           <div class="stat-card"><div class="value" id="statProviders">0</div><div class="label">Proveedores</div></div>
           <div class="stat-card"><div class="value" id="statStreams">0</div><div class="label">Streams Activos</div></div>
+          <div class="stat-card"><div class="value" id="statPlans">0</div><div class="label">Planes</div></div>
         </div>
         <div class="card">
           <h3>🏆 Top 10 Canales Más Vistos</h3>
@@ -125,14 +157,14 @@
       <!-- Channels -->
       <div class="page" id="page-channels">
         <div class="page-header">
-          <h2>📺 Canales</h2>
+          <h2>📺 Canales <span class="channel-count-badge" id="channelCount">0</span></h2>
           <button class="btn btn-primary" onclick="loadChannels()">🔄 Recargar</button>
         </div>
         <div class="search-box">
           <input type="text" id="channelSearch" placeholder="Buscar canal..." oninput="searchChannels()">
         </div>
         <div class="card">
-          <table><thead><tr><th>ID</th><th>Nombre</th><th>Grupo</th><th>Proveedor</th><th>Acciones</th></tr></thead><tbody id="channelsList"></tbody></table>
+          <table><thead><tr><th>ID</th><th>Nombre</th><th>Grupo</th><th>Proveedor</th></tr></thead><tbody id="channelsList"></tbody></table>
         </div>
       </div>
 
@@ -158,6 +190,17 @@
         </div>
       </div>
 
+      <!-- Plans -->
+      <div class="page" id="page-plans">
+        <div class="page-header">
+          <h2>💰 Planes</h2>
+          <button class="btn btn-primary" onclick="showAddPlan()">+ Crear Plan</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>ID</th><th>Nombre</th><th>Precio</th><th>Canales</th><th>Conexiones</th><th>Asignados</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="plansList"></tbody></table>
+        </div>
+      </div>
+
       <!-- Streams -->
       <div class="page" id="page-streams">
         <div class="page-header">
@@ -166,6 +209,42 @@
         </div>
         <div class="card">
           <table><thead><tr><th>Canal</th><th>Usuario</th><th>IP</th><th>Inicio</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="streamsList"></tbody></table>
+        </div>
+      </div>
+
+      <!-- WhatsApp -->
+      <div class="page" id="page-whatsapp">
+        <div class="page-header">
+          <h2>📱 WhatsApp Business</h2>
+        </div>
+        <div class="card">
+          <div class="wa-status">
+            <div class="wa-status-dot" id="waStatusDot"></div>
+            <span id="waStatusText">Desconectado</span>
+            <span id="waPhone" style="margin-left:auto;color:#888"></span>
+          </div>
+          <div class="qr-container" id="qrContainer">
+            <div class="qr-placeholder" id="qrPlaceholder">
+              <div style="font-size:48px">📱</div>
+              <p style="color:#888">Haz clic en "Generar QR" para conectar WhatsApp</p>
+            </div>
+            <img id="qrImage" style="display:none;max-width:300px;border-radius:12px">
+          </div>
+          <div style="display:flex;gap:8px;justify-content:center;margin-top:16px;flex-wrap:wrap">
+            <button class="btn btn-whatsapp" onclick="generateQR()">📱 Generar QR</button>
+            <button class="btn btn-primary" onclick="checkWAStatus()">🔄 Verificar Estado</button>
+            <button class="btn btn-danger" onclick="disconnectWA()">🔌 Desconectar</button>
+          </div>
+        </div>
+        <div class="card">
+          <h3>💬 Mensajes Recientes</h3>
+          <table><thead><tr><th>Dirección</th><th>Número</th><th>Mensaje</th><th>Estado</th><th>Fecha</th></tr></thead><tbody id="waMessages"></tbody></table>
+        </div>
+        <div class="card">
+          <h3>📤 Enviar Mensaje</h3>
+          <div class="form-group"><label>Número (con código país, ej: 573222468509)</label><input type="text" id="waToNumber" placeholder="573222468509"></div>
+          <div class="form-group"><label>Mensaje</label><textarea id="waMessage" rows="3" placeholder="Escribe tu mensaje..."></textarea></div>
+          <button class="btn btn-whatsapp" onclick="sendWAMessage()">📤 Enviar</button>
         </div>
       </div>
     </div>
@@ -196,7 +275,7 @@
       <div class="form-group"><label>Contraseña</label><input type="password" id="newPass"></div>
       <div class="form-group"><label>Email</label><input type="email" id="newEmail"></div>
       <div class="form-group"><label>Plan</label>
-        <select id="newPlan"><option value="basico">Básico ($10K/mes - 40 canales)</option><option value="estandar">Estándar ($18K/mes - 70 canales)</option><option value="premium">Premium ($25K/mes - 100+ canales)</option></select>
+        <select id="newPlan"></select>
       </div>
       <div class="form-group"><label>Días de acceso</label><input type="number" id="newDays" value="30"></div>
       <div class="modal-actions">
@@ -206,11 +285,37 @@
     </div>
   </div>
 
+  <!-- Modal Add/Edit Plan -->
+  <div class="modal-overlay" id="modalPlan">
+    <div class="modal" style="max-width:700px">
+      <h3 id="planModalTitle">Crear Plan</h3>
+      <input type="hidden" id="planId">
+      <div class="form-group"><label>Nombre del Plan</label><input type="text" id="planName" placeholder="Ej: Básico, Premium"></div>
+      <div class="form-group"><label>Descripción</label><input type="text" id="planDesc" placeholder="Descripción del plan"></div>
+      <div class="form-group"><label>Precio (COP)</label><input type="number" id="planPrice" placeholder="10000"></div>
+      <div class="form-group"><label>Máx. Canales</label><input type="number" id="planMaxCh" value="40"></div>
+      <div class="form-group"><label>Máx. Conexiones Simultáneas</label><input type="number" id="planMaxConn" value="1"></div>
+      <div class="form-group">
+        <label>Canales Asignados <span class="channel-count-badge" id="planChCount">0</span></label>
+        <input type="text" id="planChSearch" placeholder="Buscar canales..." oninput="filterPlanChannels()" style="margin-bottom:8px">
+        <div class="plan-channel-list" id="planChannelList">
+          <p style="color:#666;text-align:center;padding:20px">Cargando canales...</p>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modalPlan')">Cancelar</button>
+        <button class="btn btn-primary" onclick="savePlan()">Guardar Plan</button>
+      </div>
+    </div>
+  </div>
+
   <div class="toast" id="toast"></div>
 
   <script>
     let token = localStorage.getItem('sf_token');
     let user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+    let allChannels = [];
+    let selectedPlanChannels = new Set();
 
     if (token) { showApp(); loadDashboard(); }
 
@@ -262,18 +367,21 @@
       return res.json();
     }
 
-    function showPage(name) {
+    function showPage(name, el) {
       document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
       document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
       document.getElementById(`page-${name}`).classList.add('active');
-      event.target.classList.add('active');
+      if (el) el.classList.add('active');
       if (name === 'dashboard') loadDashboard();
       if (name === 'channels') loadChannels();
       if (name === 'providers') loadProviders();
       if (name === 'users') loadUsers();
+      if (name === 'plans') loadPlans();
       if (name === 'streams') loadStreams();
+      if (name === 'whatsapp') loadWhatsApp();
     }
 
+    // ── DASHBOARD ──
     async function loadDashboard() {
       const data = await api('/api/admin/dashboard');
       document.getElementById('statUsers').textContent = data.stats.totalUsers;
@@ -281,67 +389,49 @@
       document.getElementById('statProviders').textContent = data.stats.totalProviders;
       document.getElementById('statStreams').textContent = data.stats.activeStreams;
       
-      const topHtml = data.topChannels.map(c => `
-        <tr><td>${c.name}</td><td>${c.views}</td><td>${c.last_viewed ? new Date(c.last_viewed * 1000).toLocaleString() : '-'}</td></tr>
-      `).join('');
-      document.getElementById('topChannels').innerHTML = topHtml || '<tr><td colspan="3" style="text-align:center;color:#666">Sin datos aún</td></tr>';
+      const plans = await api('/api/admin/plans');
+      document.getElementById('statPlans').textContent = plans.plans?.length || 0;
       
+      const topHtml = (data.topChannels || []).map(c =>
+        `<tr><td>${c.name}</td><td>${c.views}</td><td>${c.last_viewed ? new Date(c.last_viewed * 1000).toLocaleString() : '-'}</td></tr>`
+      ).join('');
+      document.getElementById('topChannels').innerHTML = topHtml || '<tr><td colspan="3" style="text-align:center;color:#666">Sin datos aún</td></tr>';
       document.getElementById('currentTime').textContent = new Date().toLocaleString('es-CO');
     }
 
+    // ── CHANNELS ──
     async function loadChannels() {
       const data = await api('/api/channels');
-      const html = data.channels.map(c => `
-        <tr>
-          <td>${c.id}</td><td>${c.name}</td><td>${c.group_name || '-'}</td><td>${c.provider_name || '-'}</td>
-          <td><button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">🗑️</button></td>
-        </tr>
-      `).join('');
-      document.getElementById('channelsList').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#666">No hay canales</td></tr>';
+      allChannels = data.channels || [];
+      document.getElementById('channelCount').textContent = allChannels.length;
+      renderChannels(allChannels);
     }
 
+    function renderChannels(channels) {
+      const html = channels.slice(0, 500).map(c =>
+        `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.group_name || '-'}</td><td>${c.provider_name || '-'}</td></tr>`
+      ).join('');
+      document.getElementById('channelsList').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#666">No hay canales</td></tr>';
+    }
+
+    function searchChannels() {
+      const q = document.getElementById('channelSearch').value.toLowerCase();
+      const filtered = allChannels.filter(c => c.name.toLowerCase().includes(q) || (c.group_name || '').toLowerCase().includes(q));
+      renderChannels(filtered);
+    }
+
+    // ── PROVIDERS ──
     async function loadProviders() {
       const data = await api('/api/providers');
-      const html = data.providers.map(p => `
-        <tr>
-          <td>${p.id}</td><td>${p.name}</td><td>${p.url}</td><td>${p.max_connections}</td>
-          <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Activo' : 'Inactivo'}</span></td>
-          <td><button class="btn btn-danger btn-sm" onclick="deleteProvider(${p.id})">🗑️</button></td>
-        </tr>
-      `).join('');
+      const html = (data.providers || []).map(p =>
+        `<tr><td>${p.id}</td><td>${p.name}</td><td>${p.url}</td><td>${p.max_connections}</td>
+        <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Activo' : 'Inactivo'}</span></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteProvider(${p.id})">🗑️</button></td></tr>`
+      ).join('');
       document.getElementById('providersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay proveedores</td></tr>';
     }
 
-    async function loadUsers() {
-      const data = await api('/api/admin/users');
-      const html = data.users.map(u => `
-        <tr>
-          <td>${u.id}</td><td>${u.username}</td><td>${u.email || '-'}</td>
-          <td><span class="badge badge-warning">${u.plan}</span></td>
-          <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
-          <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button></td>
-        </tr>
-      `).join('');
-      document.getElementById('usersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay usuarios</td></tr>';
-    }
-
-    async function loadStreams() {
-      const data = await api('/api/streams/active');
-      const html = data.streams.map(s => `
-        <tr>
-          <td><span class="stream-indicator stream-live"></span>${s.channelName}</td>
-          <td>${s.username}</td><td>${s.ip}</td>
-          <td>${new Date(s.startTime).toLocaleTimeString()}</td>
-          <td><span class="badge badge-success">En vivo</span></td>
-          <td><button class="btn btn-danger btn-sm" onclick="stopStream('${s.id}')">⏹️</button></td>
-        </tr>
-      `).join('');
-      document.getElementById('streamsList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay streams activos</td></tr>';
-    }
-
     function showAddProvider() { document.getElementById('modalProvider').classList.add('active'); }
-    function showAddUser() { document.getElementById('modalUser').classList.add('active'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
     async function saveProvider() {
       const data = {
@@ -352,7 +442,6 @@
         max_connections: parseInt(document.getElementById('provMax').value)
       };
       const m3u = document.getElementById('provM3u').value;
-      
       const res = await api('/api/providers', { method: 'POST', body: JSON.stringify(data) });
       if (res.id) {
         toast('Proveedor agregado', 'success');
@@ -365,6 +454,36 @@
       } else {
         toast(res.error || 'Error', 'error');
       }
+    }
+
+    async function deleteProvider(id) {
+      if (!confirm('¿Eliminar proveedor y todos sus canales?')) return;
+      await api(`/api/providers/${id}`, { method: 'DELETE' });
+      loadProviders();
+    }
+
+    // ── USERS ──
+    async function loadUsers() {
+      const data = await api('/api/admin/users');
+      const html = (data.users || []).map(u =>
+        `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.email || '-'}</td>
+        <td><span class="badge badge-info">${u.plan}</span></td>
+        <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button></td></tr>`
+      ).join('');
+      document.getElementById('usersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay usuarios</td></tr>';
+    }
+
+    function showAddUser() {
+      // Load plans into select
+      api('/api/admin/plans').then(data => {
+        const sel = document.getElementById('newPlan');
+        sel.innerHTML = (data.plans || []).map(p => `<option value="${p.name}">${p.name} - $${p.price_cop?.toLocaleString('es-CO') || 0}/mes</option>`).join('');
+        if (!sel.innerHTML) {
+          sel.innerHTML = '<option value="basico">Básico</option><option value="estandar">Estándar</option><option value="premium">Premium</option>';
+        }
+      });
+      document.getElementById('modalUser').classList.add('active');
     }
 
     async function saveUser() {
@@ -385,17 +504,257 @@
       }
     }
 
-    async function deleteChannel(id) { if (!confirm('¿Eliminar canal?')) return; await api(`/api/channels/${id}`, { method: 'DELETE' }); loadChannels(); }
-    async function deleteProvider(id) { if (!confirm('¿Eliminar proveedor y todos sus canales?')) return; await api(`/api/providers/${id}`, { method: 'DELETE' }); loadProviders(); }
-    async function deleteUser(id) { if (!confirm('¿Eliminar usuario?')) return; await api(`/api/admin/users/${id}`, { method: 'DELETE' }); loadUsers(); }
-    async function stopStream(id) { await api(`/api/stream/${id}`, { method: 'DELETE' }); loadStreams(); }
+    async function deleteUser(id) {
+      if (!confirm('¿Eliminar usuario?')) return;
+      await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+      loadUsers();
+    }
 
-    function searchChannels() {
-      const q = document.getElementById('channelSearch').value.toLowerCase();
-      document.querySelectorAll('#channelsList tr').forEach(tr => {
-        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+    // ── PLANS ──
+    async function loadPlans() {
+      const data = await api('/api/admin/plans');
+      const html = (data.plans || []).map(p =>
+        `<tr>
+          <td>${p.id}</td>
+          <td><strong>${p.name}</strong></td>
+          <td class="price-tag">$${p.price_cop?.toLocaleString('es-CO') || 0}</td>
+          <td>${p.max_channels}</td>
+          <td>${p.max_connections}</td>
+          <td><span class="channel-count-badge">${p.channel_count || 0}</span></td>
+          <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Activo' : 'Inactivo'}</span></td>
+          <td>
+            <button class="btn btn-primary btn-sm" onclick="editPlan(${p.id})">✏️</button>
+            <button class="btn btn-danger btn-sm" onclick="deletePlan(${p.id})">🗑️</button>
+          </td>
+        </tr>`
+      ).join('');
+      document.getElementById('plansList').innerHTML = html || '<tr><td colspan="8" style="text-align:center;color:#666">No hay planes</td></tr>';
+    }
+
+    function showAddPlan() {
+      document.getElementById('planModalTitle').textContent = 'Crear Plan';
+      document.getElementById('planId').value = '';
+      document.getElementById('planName').value = '';
+      document.getElementById('planDesc').value = '';
+      document.getElementById('planPrice').value = '';
+      document.getElementById('planMaxCh').value = '40';
+      document.getElementById('planMaxConn').value = '1';
+      selectedPlanChannels = new Set();
+      document.getElementById('planChCount').textContent = '0';
+      loadPlanChannelList();
+      document.getElementById('modalPlan').classList.add('active');
+    }
+
+    async function editPlan(id) {
+      const data = await api(`/api/admin/plans`);
+      const plan = (data.plans || []).find(p => p.id === id);
+      if (!plan) return;
+
+      document.getElementById('planModalTitle').textContent = 'Editar Plan';
+      document.getElementById('planId').value = plan.id;
+      document.getElementById('planName').value = plan.name;
+      document.getElementById('planDesc').value = plan.description || '';
+      document.getElementById('planPrice').value = plan.price_cop;
+      document.getElementById('planMaxCh').value = plan.max_channels;
+      document.getElementById('planMaxConn').value = plan.max_connections;
+
+      // Load assigned channels
+      const chData = await api(`/api/admin/plans/${id}/channels`);
+      selectedPlanChannels = new Set((chData.channels || []).map(c => c.id));
+      document.getElementById('planChCount').textContent = selectedPlanChannels.size;
+
+      loadPlanChannelList();
+      document.getElementById('modalPlan').classList.add('active');
+    }
+
+    async function loadPlanChannelList() {
+      const data = await api('/api/admin/channels/grouped?q=&limit=500');
+      const groups = data.groups || {};
+      const container = document.getElementById('planChannelList');
+      let html = '';
+      for (const [group, channels] of Object.entries(groups)) {
+        html += `<div class="cat-group-header">${group} (${channels.length})</div>`;
+        for (const ch of channels) {
+          const checked = selectedPlanChannels.has(ch.id) ? 'checked' : '';
+          html += `<label class="plan-channel-item"><input type="checkbox" value="${ch.id}" ${checked} onchange="togglePlanChannel(${ch.id})"> ${ch.name}</label>`;
+        }
+      }
+      container.innerHTML = html || '<p style="color:#666;text-align:center;padding:20px">No hay canales disponibles</p>';
+    }
+
+    function filterPlanChannels() {
+      const q = document.getElementById('planChSearch').value.toLowerCase();
+      document.querySelectorAll('#planChannelList .plan-channel-item').forEach(el => {
+        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
       });
     }
+
+    function togglePlanChannel(id) {
+      if (selectedPlanChannels.has(id)) {
+        selectedPlanChannels.delete(id);
+      } else {
+        selectedPlanChannels.add(id);
+      }
+      document.getElementById('planChCount').textContent = selectedPlanChannels.size;
+    }
+
+    async function savePlan() {
+      const id = document.getElementById('planId').value;
+      const data = {
+        name: document.getElementById('planName').value,
+        description: document.getElementById('planDesc').value,
+        price_cop: parseInt(document.getElementById('planPrice').value) || 0,
+        max_channels: parseInt(document.getElementById('planMaxCh').value) || 40,
+        max_connections: parseInt(document.getElementById('planMaxConn').value) || 1,
+        channel_ids: Array.from(selectedPlanChannels)
+      };
+
+      if (!data.name) { toast('Nombre requerido', 'error'); return; }
+
+      if (id) {
+        await api(`/api/admin/plans/${id}`, { method: 'PUT', body: JSON.stringify(data) });
+        toast('Plan actualizado', 'success');
+      } else {
+        await api('/api/admin/plans', { method: 'POST', body: JSON.stringify(data) });
+        toast('Plan creado', 'success');
+      }
+      closeModal('modalPlan');
+      loadPlans();
+    }
+
+    async function deletePlan(id) {
+      if (!confirm('¿Eliminar plan?')) return;
+      await api(`/api/admin/plans/${id}`, { method: 'DELETE' });
+      loadPlans();
+    }
+
+    // ── STREAMS ──
+    async function loadStreams() {
+      const data = await api('/api/streams/active');
+      const html = (data.streams || []).map(s =>
+        `<tr>
+          <td><span class="stream-indicator stream-live"></span>${s.channelName}</td>
+          <td>${s.username}</td><td>${s.ip}</td>
+          <td>${new Date(s.startTime).toLocaleTimeString()}</td>
+          <td><span class="badge badge-success">En vivo</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="stopStream('${s.id}')">⏹️</button></td>
+        </tr>`
+      ).join('');
+      document.getElementById('streamsList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay streams activos</td></tr>';
+    }
+
+    async function stopStream(id) {
+      await api(`/api/stream/${id}`, { method: 'DELETE' });
+      loadStreams();
+    }
+
+    // ── WHATSAPP ──
+    async function loadWhatsApp() {
+      const data = await api('/api/admin/whatsapp');
+      updateWAStatus(data);
+      loadWAMessages();
+    }
+
+    function updateWAStatus(data) {
+      const dot = document.getElementById('waStatusDot');
+      const text = document.getElementById('waStatusText');
+      const phone = document.getElementById('waPhone');
+
+      if (data.session) {
+        const status = data.session.status;
+        dot.className = 'wa-status-dot ' + (status === 'connected' ? 'wa-connected' : status === 'waiting_scan' || status === 'waiting_qr' ? 'wa-waiting' : 'wa-disconnected');
+        text.textContent = status === 'connected' ? 'Conectado' : status === 'waiting_scan' ? 'Esperando escaneo...' : status === 'waiting_qr' ? 'Generando QR...' : 'Desconectado';
+        phone.textContent = data.session.phone || '';
+      } else {
+        dot.className = 'wa-status-dot wa-disconnected';
+        text.textContent = 'Desconectado';
+        phone.textContent = '';
+      }
+    }
+
+    async function generateQR() {
+      document.getElementById('qrPlaceholder').innerHTML = '<div class="qr-loading"></div><p style="color:#888">Generando código QR...</p>';
+      document.getElementById('qrImage').style.display = 'none';
+      
+      const res = await api('/api/admin/whatsapp/qr', { method: 'POST', body: JSON.stringify({}) });
+      if (res.success) {
+        toast('QR generado. Escanea con WhatsApp.', 'success');
+        // Poll for QR image
+        pollQRStatus(res.sessionId);
+      } else {
+        toast(res.error || 'Error', 'error');
+      }
+    }
+
+    async function pollQRStatus(sessionId) {
+      let attempts = 0;
+      const interval = setInterval(async () => {
+        attempts++;
+        const data = await api('/api/admin/whatsapp/status');
+        updateWAStatus(data);
+        
+        if (data.status === 'connected') {
+          clearInterval(interval);
+          toast('¡WhatsApp conectado!', 'success');
+          document.getElementById('qrPlaceholder').innerHTML = '<div style="font-size:48px">✅</div><p style="color:#25d366">WhatsApp conectado correctamente</p>';
+          return;
+        }
+        
+        if (attempts > 60) {
+          clearInterval(interval);
+          document.getElementById('qrPlaceholder').innerHTML = '<div style="font-size:48px">⏰</div><p style="color:#ffab40">Tiempo agotado. Intenta de nuevo.</p>';
+        }
+      }, 2000);
+    }
+
+    async function checkWAStatus() {
+      const data = await api('/api/admin/whatsapp/status');
+      updateWAStatus({ session: data });
+      if (data.status === 'connected') {
+        toast('WhatsApp conectado: ' + (data.phone || ''), 'success');
+      } else {
+        toast('Estado: ' + data.status, 'error');
+      }
+    }
+
+    async function disconnectWA() {
+      if (!confirm('¿Desconectar WhatsApp?')) return;
+      await api('/api/admin/whatsapp/disconnect', { method: 'POST', body: JSON.stringify({}) });
+      toast('WhatsApp desconectado', 'success');
+      loadWhatsApp();
+    }
+
+    async function loadWAMessages() {
+      const data = await api('/api/admin/whatsapp/messages?limit=20');
+      const html = (data.messages || []).map(m =>
+        `<tr>
+          <td><span class="badge ${m.direction === 'incoming' ? 'badge-info' : 'badge-success'}">${m.direction === 'incoming' ? '📥 Entrada' : '📤 Salida'}</span></td>
+          <td>${m.from_number || m.to_number || '-'}</td>
+          <td style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${m.message || '-'}</td>
+          <td><span class="badge ${m.status === 'sent' || m.status === 'received' ? 'badge-success' : 'badge-warning'}">${m.status}</span></td>
+          <td>${new Date(m.created_at * 1000).toLocaleString('es-CO')}</td>
+        </tr>`
+      ).join('');
+      document.getElementById('waMessages').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#666">Sin mensajes</td></tr>';
+    }
+
+    async function sendWAMessage() {
+      const to = document.getElementById('waToNumber').value.trim();
+      const message = document.getElementById('waMessage').value.trim();
+      if (!to || !message) { toast('Número y mensaje requeridos', 'error'); return; }
+      
+      const res = await api('/api/admin/whatsapp/send', { method: 'POST', body: JSON.stringify({ to, message }) });
+      if (res.success) {
+        toast('Mensaje enviado', 'success');
+        document.getElementById('waMessage').value = '';
+        loadWAMessages();
+      } else {
+        toast(res.error || 'Error', 'error');
+      }
+    }
+
+    // ── UTILS ──
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
     function toast(msg, type) {
       const el = document.getElementById('toast');

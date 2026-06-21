@@ -1,7 +1,7 @@
 FROM node:20-alpine
 
-# Install FFmpeg for streaming
-RUN apk add --no-cache ffmpeg
+# Install FFmpeg for streaming and wget for healthcheck
+RUN apk add --no-cache ffmpeg wget
 
 WORKDIR /app
 
