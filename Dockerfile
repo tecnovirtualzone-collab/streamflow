@@ -1,38 +1,42 @@
-FROM python:3.11-slim
+FROM node:20-alpine
 
-# Instalar Node.js, Chromium y FFmpeg
-RUN apt-get update && apt-get install -y \
-    curl gnupg \
-    chromium \
-    ffmpeg \
-    libgbm-dev libasound2 libatk1.0-0 libcairo2 \
-    libcups2 libdbus-1-3 libglib2.0-0 libgtk-3-0 \
-    libnspr4 libnss3 libpango-1.0-0 libx11-6 \
-    libxcomposite1 libxdamage1 libxext6 libxrandr2 \
-    fonts-liberation \
-    --no-install-recommends \
-    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
-    && apt-get install -y nodejs \
-    && rm -rf /var/lib/apt/lists/*
-
-ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
-ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+# Install FFmpeg for streaming
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
 
-# Python deps
-COPY requirements.txt .
-RUN pip install --no-cache-dir --force-reinstall -r requirements.txt && \
-    python3 -c "import psycopg2; print('psycopg2 OK')"
+# Copy package files
+COPY package.json package-lock.json* ./
 
-# Node deps
-COPY wa-service/package*.json ./wa-service/
-RUN cd wa-service && npm install --production
+# Install dependencies
+RUN npm install --production
 
-COPY . .
+# Copy application code
+COPY src ./src
+COPY public ./public
+COPY server.js ./
 
-EXPOSE 5000 3001
+# Environment variables (all configurable at runtime)
+ENV PORT=5000
+ENV DATA_DIR=/data
+ENV JWT_SECRET=streamflow-change-me
+ENV JWT_EXPIRES_IN=24h
+ENV BCRYPT_ROUNDS=10
+ENV INITIAL_ADMIN_PASSWORD=admin123
+ENV STREAM_MAX_CONCURRENT=3
+ENV STREAM_INACTIVITY_TIMEOUT_MS=120000
+ENV TZ=America/Bogota
+ENV NODE_ENV=production
 
-COPY start.sh .
-RUN chmod +x start.sh
-CMD ["./start.sh"]
+# Create data directory
+RUN mkdir -p /data
+
+# Expose port
+EXPOSE 5000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD wget --no-verbose --tries=1 --spider http://localhost:5000/health || exit 1
+
+# Start
+CMD ["node", "server.js"]

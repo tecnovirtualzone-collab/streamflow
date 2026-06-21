@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🌙 StreamFlow - Panel Admin</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', system-ui, sans-serif; background: #0f0f1a; color: #e0e0e0; min-height: 100vh; }
+    
+    .login-container { display: flex; align-items: center; justify-content: center; min-height: 100vh; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); }
+    .login-box { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 40px; width: 100%; max-width: 400px; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    .login-box h1 { text-align: center; margin-bottom: 24px; color: #64ffda; }
+    .login-box input { width: 100%; padding: 12px 16px; margin-bottom: 16px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+    .login-box input:focus { outline: none; border-color: #64ffda; }
+    .login-box button { width: 100%; padding: 12px; background: linear-gradient(135deg, #64ffda, #00bcd4); border: none; border-radius: 8px; color: #0f0f1a; font-weight: 700; cursor: pointer; font-size: 16px; }
+    .login-box button:hover { opacity: 0.9; }
+    .login-error { color: #ff5252; text-align: center; margin-top: 12px; display: none; }
+
+    .app-container { display: none; min-height: 100vh; }
+    .sidebar { position: fixed; left: 0; top: 0; width: 240px; height: 100vh; background: #1a1a2e; border-right: 1px solid #2a2a4a; padding: 20px 0; z-index: 100; }
+    .sidebar .logo { padding: 0 20px 20px; font-size: 20px; font-weight: 700; color: #64ffda; border-bottom: 1px solid #2a2a4a; margin-bottom: 20px; }
+    .sidebar .nav-item { padding: 12px 20px; cursor: pointer; transition: background 0.2s; display: flex; align-items: center; gap: 10px; }
+    .sidebar .nav-item:hover, .sidebar .nav-item.active { background: #2a2a4a; }
+    .sidebar .nav-item.active { border-left: 3px solid #64ffda; }
+    .sidebar .logout { position: absolute; bottom: 20px; width: 100%; padding: 12px 20px; cursor: pointer; color: #ff5252; }
+
+    .main-content { margin-left: 240px; padding: 24px; }
+    .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .page-header h2 { font-size: 24px; color: #fff; }
+
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; color: #64ffda; }
+    .stat-card .label { font-size: 13px; color: #888; margin-top: 4px; }
+
+    .card { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 20px; margin-bottom: 24px; }
+    .card h3 { margin-bottom: 16px; color: #fff; font-size: 16px; }
+
+    table { width: 100%; border-collapse: collapse; }
+    th, td { padding: 12px; text-align: left; border-bottom: 1px solid #2a2a4a; }
+    th { color: #888; font-weight: 600; font-size: 13px; text-transform: uppercase; }
+    td { font-size: 14px; }
+    tr:hover td { background: #1f1f35; }
+
+    .btn { padding: 8px 16px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-primary { background: #64ffda; color: #0f0f1a; }
+    .btn-danger { background: #ff5252; color: #fff; }
+    .btn-sm { padding: 6px 12px; font-size: 12px; }
+
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; margin-bottom: 6px; font-size: 13px; color: #888; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 14px; background: #0f0f1a; border: 1px solid #2a2a4a; border-radius: 8px; color: #e0e0e0; font-size: 14px; }
+    .form-group textarea { min-height: 200px; font-family: monospace; }
+
+    .badge { padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+    .badge-success { background: #1b5e20; color: #64ffda; }
+    .badge-warning { background: #e65100; color: #ffab40; }
+    .badge-danger { background: #b71c1c; color: #ff5252; }
+
+    .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 1000; align-items: center; justify-content: center; }
+    .modal-overlay.active { display: flex; }
+    .modal { background: #1a1a2e; border: 1px solid #2a2a4a; border-radius: 12px; padding: 24px; width: 100%; max-width: 500px; max-height: 80vh; overflow-y: auto; }
+    .modal h3 { margin-bottom: 16px; color: #64ffda; }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+    .toast { position: fixed; top: 20px; right: 20px; padding: 12px 20px; border-radius: 8px; z-index: 2000; font-weight: 600; display: none; }
+    .toast-success { background: #1b5e20; color: #64ffda; display: block; }
+    .toast-error { background: #b71c1c; color: #ff5252; display: block; }
+
+    .search-box { display: flex; gap: 8px; margin-bottom: 16px; }
+    .search-box input { flex: 1; }
+
+    .stream-indicator { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
+    .stream-live { background: #64ffda; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+
+    .page { display: none; }
+    .page.active { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Login -->
+  <div class="login-container" id="loginPage">
+    <div class="login-box">
+      <h1>🌙 StreamFlow</h1>
+      <input type="text" id="loginUsername" placeholder="Usuario" value="admin">
+      <input type="password" id="loginPassword" placeholder="Contraseña" value="admin123">
+      <button onclick="login()">Ingresar</button>
+      <p class="login-error" id="loginError">Credenciales inválidas</p>
+    </div>
+  </div>
+
+  <!-- App -->
+  <div class="app-container" id="appContainer">
+    <div class="sidebar">
+      <div class="logo">🌙 StreamFlow</div>
+      <div class="nav-item active" onclick="showPage('dashboard')">📊 Dashboard</div>
+      <div class="nav-item" onclick="showPage('channels')">📺 Canales</div>
+      <div class="nav-item" onclick="showPage('providers')">🔗 Proveedores</div>
+      <div class="nav-item" onclick="showPage('users')">👥 Usuarios</div>
+      <div class="nav-item" onclick="showPage('streams')">📡 Streams Activos</div>
+      <div class="logout" onclick="logout()">🚪 Cerrar Sesión</div>
+    </div>
+
+    <div class="main-content">
+      <!-- Dashboard -->
+      <div class="page active" id="page-dashboard">
+        <div class="page-header">
+          <h2>📊 Dashboard</h2>
+          <span id="currentTime"></span>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="value" id="statUsers">0</div><div class="label">Usuarios</div></div>
+          <div class="stat-card"><div class="value" id="statChannels">0</div><div class="label">Canales</div></div>
+          <div class="stat-card"><div class="value" id="statProviders">0</div><div class="label">Proveedores</div></div>
+          <div class="stat-card"><div class="value" id="statStreams">0</div><div class="label">Streams Activos</div></div>
+        </div>
+        <div class="card">
+          <h3>🏆 Top 10 Canales Más Vistos</h3>
+          <table><thead><tr><th>Canal</th><th>Vistas</th><th>Último Acceso</th></tr></thead><tbody id="topChannels"></tbody></table>
+        </div>
+      </div>
+
+      <!-- Channels -->
+      <div class="page" id="page-channels">
+        <div class="page-header">
+          <h2>📺 Canales</h2>
+          <button class="btn btn-primary" onclick="loadChannels()">🔄 Recargar</button>
+        </div>
+        <div class="search-box">
+          <input type="text" id="channelSearch" placeholder="Buscar canal..." oninput="searchChannels()">
+        </div>
+        <div class="card">
+          <table><thead><tr><th>ID</th><th>Nombre</th><th>Grupo</th><th>Proveedor</th><th>Acciones</th></tr></thead><tbody id="channelsList"></tbody></table>
+        </div>
+      </div>
+
+      <!-- Providers -->
+      <div class="page" id="page-providers">
+        <div class="page-header">
+          <h2>🔗 Proveedores</h2>
+          <button class="btn btn-primary" onclick="showAddProvider()">+ Agregar</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>ID</th><th>Nombre</th><th>URL</th><th>Conexiones</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="providersList"></tbody></table>
+        </div>
+      </div>
+
+      <!-- Users -->
+      <div class="page" id="page-users">
+        <div class="page-header">
+          <h2>👥 Usuarios</h2>
+          <button class="btn btn-primary" onclick="showAddUser()">+ Agregar Usuario</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>ID</th><th>Usuario</th><th>Email</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="usersList"></tbody></table>
+        </div>
+      </div>
+
+      <!-- Streams -->
+      <div class="page" id="page-streams">
+        <div class="page-header">
+          <h2>📡 Streams Activos</h2>
+          <button class="btn btn-primary" onclick="loadStreams()">🔄 Refrescar</button>
+        </div>
+        <div class="card">
+          <table><thead><tr><th>Canal</th><th>Usuario</th><th>IP</th><th>Inicio</th><th>Estado</th><th>Acción</th></tr></thead><tbody id="streamsList"></tbody></table>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Add Provider -->
+  <div class="modal-overlay" id="modalProvider">
+    <div class="modal">
+      <h3>Agregar Proveedor</h3>
+      <div class="form-group"><label>Nombre</label><input type="text" id="provName"></div>
+      <div class="form-group"><label>URL Base</label><input type="text" id="provUrl" placeholder="http://ejemplo.com:80"></div>
+      <div class="form-group"><label>Usuario</label><input type="text" id="provUser"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="provPass"></div>
+      <div class="form-group"><label>Conexiones Máximas</label><input type="number" id="provMax" value="3"></div>
+      <div class="form-group"><label>Contenido M3U (opcional)</label><textarea id="provM3u" placeholder="#EXTINF:-1,Channel Name&#10;http://stream.url"></textarea></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modalProvider')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveProvider()">Guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Add User -->
+  <div class="modal-overlay" id="modalUser">
+    <div class="modal">
+      <h3>Agregar Usuario</h3>
+      <div class="form-group"><label>Usuario</label><input type="text" id="newUser"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="newPass"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="newEmail"></div>
+      <div class="form-group"><label>Plan</label>
+        <select id="newPlan"><option value="basico">Básico ($10K/mes - 40 canales)</option><option value="estandar">Estándar ($18K/mes - 70 canales)</option><option value="premium">Premium ($25K/mes - 100+ canales)</option></select>
+      </div>
+      <div class="form-group"><label>Días de acceso</label><input type="number" id="newDays" value="30"></div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeModal('modalUser')">Cancelar</button>
+        <button class="btn btn-primary" onclick="saveUser()">Crear</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let token = localStorage.getItem('sf_token');
+    let user = JSON.parse(localStorage.getItem('sf_user') || '{}');
+
+    if (token) { showApp(); loadDashboard(); }
+
+    async function login() {
+      const username = document.getElementById('loginUsername').value;
+      const password = document.getElementById('loginPassword').value;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, password })
+        });
+        const data = await res.json();
+        if (data.token) {
+          token = data.token;
+          user = data.user;
+          localStorage.setItem('sf_token', token);
+          localStorage.setItem('sf_user', JSON.stringify(user));
+          showApp();
+          loadDashboard();
+        } else {
+          document.getElementById('loginError').style.display = 'block';
+        }
+      } catch(e) { document.getElementById('loginError').style.display = 'block'; }
+    }
+
+    function logout() {
+      localStorage.clear();
+      token = null;
+      user = {};
+      document.getElementById('appContainer').style.display = 'none';
+      document.getElementById('loginPage').style.display = 'flex';
+    }
+
+    function showApp() {
+      document.getElementById('loginPage').style.display = 'none';
+      document.getElementById('appContainer').style.display = 'block';
+    }
+
+    async function api(path, opts = {}) {
+      const res = await fetch(path, {
+        ...opts,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+          ...(opts.headers || {})
+        }
+      });
+      return res.json();
+    }
+
+    function showPage(name) {
+      document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      document.getElementById(`page-${name}`).classList.add('active');
+      event.target.classList.add('active');
+      if (name === 'dashboard') loadDashboard();
+      if (name === 'channels') loadChannels();
+      if (name === 'providers') loadProviders();
+      if (name === 'users') loadUsers();
+      if (name === 'streams') loadStreams();
+    }
+
+    async function loadDashboard() {
+      const data = await api('/api/admin/dashboard');
+      document.getElementById('statUsers').textContent = data.stats.totalUsers;
+      document.getElementById('statChannels').textContent = data.stats.totalChannels;
+      document.getElementById('statProviders').textContent = data.stats.totalProviders;
+      document.getElementById('statStreams').textContent = data.stats.activeStreams;
+      
+      const topHtml = data.topChannels.map(c => `
+        <tr><td>${c.name}</td><td>${c.views}</td><td>${c.last_viewed ? new Date(c.last_viewed * 1000).toLocaleString() : '-'}</td></tr>
+      `).join('');
+      document.getElementById('topChannels').innerHTML = topHtml || '<tr><td colspan="3" style="text-align:center;color:#666">Sin datos aún</td></tr>';
+      
+      document.getElementById('currentTime').textContent = new Date().toLocaleString('es-CO');
+    }
+
+    async function loadChannels() {
+      const data = await api('/api/channels');
+      const html = data.channels.map(c => `
+        <tr>
+          <td>${c.id}</td><td>${c.name}</td><td>${c.group_name || '-'}</td><td>${c.provider_name || '-'}</td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteChannel(${c.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('channelsList').innerHTML = html || '<tr><td colspan="5" style="text-align:center;color:#666">No hay canales</td></tr>';
+    }
+
+    async function loadProviders() {
+      const data = await api('/api/providers');
+      const html = data.providers.map(p => `
+        <tr>
+          <td>${p.id}</td><td>${p.name}</td><td>${p.url}</td><td>${p.max_connections}</td>
+          <td><span class="badge ${p.is_active ? 'badge-success' : 'badge-danger'}">${p.is_active ? 'Activo' : 'Inactivo'}</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteProvider(${p.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('providersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay proveedores</td></tr>';
+    }
+
+    async function loadUsers() {
+      const data = await api('/api/admin/users');
+      const html = data.users.map(u => `
+        <tr>
+          <td>${u.id}</td><td>${u.username}</td><td>${u.email || '-'}</td>
+          <td><span class="badge badge-warning">${u.plan}</span></td>
+          <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('usersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay usuarios</td></tr>';
+    }
+
+    async function loadStreams() {
+      const data = await api('/api/streams/active');
+      const html = data.streams.map(s => `
+        <tr>
+          <td><span class="stream-indicator stream-live"></span>${s.channelName}</td>
+          <td>${s.username}</td><td>${s.ip}</td>
+          <td>${new Date(s.startTime).toLocaleTimeString()}</td>
+          <td><span class="badge badge-success">En vivo</span></td>
+          <td><button class="btn btn-danger btn-sm" onclick="stopStream('${s.id}')">⏹️</button></td>
+        </tr>
+      `).join('');
+      document.getElementById('streamsList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay streams activos</td></tr>';
+    }
+
+    function showAddProvider() { document.getElementById('modalProvider').classList.add('active'); }
+    function showAddUser() { document.getElementById('modalUser').classList.add('active'); }
+    function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+    async function saveProvider() {
+      const data = {
+        name: document.getElementById('provName').value,
+        url: document.getElementById('provUrl').value,
+        username: document.getElementById('provUser').value,
+        password: document.getElementById('provPass').value,
+        max_connections: parseInt(document.getElementById('provMax').value)
+      };
+      const m3u = document.getElementById('provM3u').value;
+      
+      const res = await api('/api/providers', { method: 'POST', body: JSON.stringify(data) });
+      if (res.id) {
+        toast('Proveedor agregado', 'success');
+        if (m3u) {
+          await api('/api/admin/import-m3u', { method: 'POST', body: JSON.stringify({ provider_id: res.id, m3u_content: m3u }) });
+          toast('M3U importado', 'success');
+        }
+        closeModal('modalProvider');
+        loadProviders();
+      } else {
+        toast(res.error || 'Error', 'error');
+      }
+    }
+
+    async function saveUser() {
+      const data = {
+        username: document.getElementById('newUser').value,
+        password: document.getElementById('newPass').value,
+        email: document.getElementById('newEmail').value,
+        plan: document.getElementById('newPlan').value,
+        expires_days: parseInt(document.getElementById('newDays').value)
+      };
+      const res = await api('/api/admin/users', { method: 'POST', body: JSON.stringify(data) });
+      if (res.id) {
+        toast('Usuario creado', 'success');
+        closeModal('modalUser');
+        loadUsers();
+      } else {
+        toast(res.error || 'Error', 'error');
+      }
+    }
+
+    async function deleteChannel(id) { if (!confirm('¿Eliminar canal?')) return; await api(`/api/channels/${id}`, { method: 'DELETE' }); loadChannels(); }
+    async function deleteProvider(id) { if (!confirm('¿Eliminar proveedor y todos sus canales?')) return; await api(`/api/providers/${id}`, { method: 'DELETE' }); loadProviders(); }
+    async function deleteUser(id) { if (!confirm('¿Eliminar usuario?')) return; await api(`/api/admin/users/${id}`, { method: 'DELETE' }); loadUsers(); }
+    async function stopStream(id) { await api(`/api/stream/${id}`, { method: 'DELETE' }); loadStreams(); }
+
+    function searchChannels() {
+      const q = document.getElementById('channelSearch').value.toLowerCase();
+      document.querySelectorAll('#channelsList tr').forEach(tr => {
+        tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    }
+
+    function toast(msg, type) {
+      const el = document.getElementById('toast');
+      el.textContent = msg;
+      el.className = `toast toast-${type}`;
+      setTimeout(() => el.className = 'toast', 3000);
+    }
+
+    setInterval(() => { if (token) loadDashboard(); }, 30000);
+  </script>
+</body>
+</html>

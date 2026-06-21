@@ -1,19 +1,6 @@
-venv/
-__pycache__/
-*.pyc
-*.pyo
-test.db
-instance/
+node_modules/
+.env
+data/
+*.sqlite
 *.log
 .DS_Store
-Thumbs.db
-get-pip.py
-run_tests.py
-start_test.sh
-test.sh
-# Provider data (large files)
-provider.m3u
-test_results/
-*.ts
-*.m3u8
-test_*.py
