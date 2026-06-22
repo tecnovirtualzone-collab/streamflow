@@ -5,15 +5,12 @@
  * Usage: node whatsapp_service.js [session_id]
  */
 
-import { Client, LocalAuth } from 'whatsapp-web.js';
+import pkg from 'whatsapp-web.js';
+const { Client, LocalAuth } = pkg;
 import QRCode from 'qrcode';
 import Database from 'better-sqlite3';
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const SESSION_DIR = path.join(DATA_DIR, 'whatsapp_sessions');
@@ -30,10 +27,21 @@ const sessionId = process.argv[2] || `sf_${Date.now()}`;
 console.log(`[WA] Starting WhatsApp session: ${sessionId}`);
 
 const updateSession = (fields) => {
-  const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
-  const values = Object.values(fields);
-  db.prepare(`UPDATE whatsapp_sessions SET ${sets} WHERE session_id = ?`).run(...values, sessionId);
+  try {
+    const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ');
+    const values = Object.values(fields);
+    db.prepare(`UPDATE whatsapp_sessions SET ${sets} WHERE session_id = ?`).run(...values, sessionId);
+  } catch (err) {
+    console.error('[WA] DB update error:', err.message);
+  }
 };
+
+// Create session record
+try {
+  db.prepare('INSERT OR REPLACE INTO whatsapp_sessions (session_id, status) VALUES (?, ?)').run(sessionId, 'initializing');
+} catch (err) {
+  console.error('[WA] Session creation error:', err.message);
+}
 
 const client = new Client({
   authStrategy: new LocalAuth({
@@ -42,6 +50,7 @@ const client = new Client({
   }),
   puppeteer: {
     headless: true,
+    executablePath: '/snap/chromium/current/usr/lib/chromium-browser/chrome',
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
@@ -49,7 +58,9 @@ const client = new Client({
       '--disable-gpu',
       '--no-first-run',
       '--no-zygote',
-      '--single-process'
+      '--single-process',
+      '--disable-dbus',
+      '--disable-software-rasterizer'
     ]
   }
 });
@@ -57,7 +68,6 @@ const client = new Client({
 client.on('qr', async (qr) => {
   console.log('[WA] QR Code received');
   
-  // Generate QR as data URL for web display
   try {
     const qrDataUrl = await QRCode.toDataURL(qr);
     updateSession({ 
@@ -65,6 +75,7 @@ client.on('qr', async (qr) => {
       qr_code: qrDataUrl,
       last_seen: Math.floor(Date.now() / 1000)
     });
+    console.log('[WA] QR saved to DB');
   } catch (err) {
     console.error('[WA] QR generation error:', err);
     updateSession({ 
@@ -138,10 +149,25 @@ client.on('message_create', async (msg) => {
   }
 });
 
+// Catch unhandled errors from puppeteer/whatsapp-web
+process.on('unhandledRejection', (err) => {
+  console.error('[WA] Unhandled rejection:', err.message || err);
+  // Don't exit - keep trying
+});
+
+process.on('uncaughtException', (err) => {
+  console.error('[WA] Uncaught exception:', err.message || err);
+  // Don't exit - keep trying
+});
+
 client.initialize().catch(err => {
-  console.error('[WA] Init error:', err);
+  console.error('[WA] Init error:', err.message || err);
   updateSession({ status: 'error' });
-  process.exit(1);
+  // Retry after 30 seconds
+  setTimeout(() => {
+    console.log('[WA] Retrying initialization...');
+    client.initialize().catch(e => console.error('[WA] Retry failed:', e.message));
+  }, 30000);
 });
 
 process.on('SIGTERM', async () => {

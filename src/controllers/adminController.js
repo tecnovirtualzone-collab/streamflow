@@ -4,13 +4,13 @@ import { authMiddleware } from '../middleware/auth.js';
 export function setupAdminRoutes(app) {
   // Get all users
   app.get('/api/admin/users', authMiddleware, (req, res) => {
-    const users = db.prepare('SELECT id, username, email, plan, max_channels, is_active, created_at, expires_at FROM users ORDER BY created_at DESC').all();
+    const users = db.prepare('SELECT id, username, email, whatsapp, plan, max_channels, is_active, created_at, expires_at FROM users ORDER BY created_at DESC').all();
     res.json({ users });
   });
 
   // Create user
   app.post('/api/admin/users', authMiddleware, async (req, res) => {
-    const { username, password, email, plan, max_channels, expires_days } = req.body;
+    const { username, password, email, whatsapp, plan, max_channels, expires_days } = req.body;
     if (!username || !password) return res.status(400).json({ error: 'Username y password requeridos' });
 
     const existing = db.prepare('SELECT id FROM users WHERE username = ?').get(username);
@@ -22,8 +22,8 @@ export function setupAdminRoutes(app) {
     const planChannels = { basico: 40, estandar: 70, premium: 100 }[plan] || 40;
 
     const result = db.prepare(
-      'INSERT INTO users (username, password, email, plan, max_channels, expires_at) VALUES (?, ?, ?, ?, ?, ?)'
-    ).run(username, hashedPassword, email || '', plan || 'basico', max_channels || planChannels, expiresAt);
+      'INSERT INTO users (username, password, email, whatsapp, plan, max_channels, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    ).run(username, hashedPassword, email || '', whatsapp || '', plan || 'basico', max_channels || planChannels, expiresAt);
 
     res.status(201).json({ id: result.lastInsertRowid, username, plan: plan || 'basico' });
   });

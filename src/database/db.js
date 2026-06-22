@@ -24,14 +24,15 @@ export function runMigrations() {
 
     CREATE TABLE IF NOT EXISTS users (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      username TEXT UNIQUE NOT NULL,
-      password TEXT NOT NULL,
+      username TEXT UNIQUE,
+      password TEXT,
       email TEXT DEFAULT '',
+      whatsapp TEXT DEFAULT '',
       plan TEXT DEFAULT 'basico',
       max_channels INTEGER DEFAULT 40,
       is_active INTEGER DEFAULT 1,
-      created_at INTEGER DEFAULT (strftime('%s','now')),
-      expires_at INTEGER DEFAULT 0
+      expires_at INTEGER,
+      created_at INTEGER DEFAULT (strftime('%s', 'now'))
     );
 
     CREATE TABLE IF NOT EXISTS providers (

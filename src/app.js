@@ -12,6 +12,7 @@ import { setupAdminRoutes } from './controllers/adminController.js';
 import { setupPlanRoutes } from './controllers/planController.js';
 import { setupWhatsAppRoutes } from './controllers/whatsappController.js';
 import streamManager from './services/streamManager.js';
+import { createProxyMiddleware } from 'http-proxy-middleware';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -40,6 +41,29 @@ setupProviderRoutes(app);
 setupAdminRoutes(app);
 setupPlanRoutes(app);
 setupWhatsAppRoutes(app);
+
+// WA Service proxy (microservicio WA en puerto 5002)
+const WA_PORT = process.env.WA_PORT || 5002;
+app.use('/wa', async (req, res) => {
+  try {
+    const url = `http://127.0.0.1:${WA_PORT}/wa${req.path}`;
+    const response = await fetch(url, {
+      method: req.method,
+      headers: { 'Content-Type': 'application/json' },
+      body: req.method !== 'GET' ? JSON.stringify(req.body) : undefined
+    });
+    const contentType = response.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const data = await response.json();
+      res.json(data);
+    } else {
+      const text = await response.text();
+      res.type('html').send(text);
+    }
+  } catch (err) {
+    res.status(502).json({ error: 'WA Service unavailable', message: err.message });
+  }
+});
 
 // Serve admin panel
 app.use(express.static(path.join(__dirname, '..', 'public')));

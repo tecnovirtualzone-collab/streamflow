@@ -118,7 +118,8 @@ export function setupPlanRoutes(app) {
 
   // Get all channels grouped by category (for plan builder)
   app.get('/api/admin/channels/grouped', authMiddleware, (req, res) => {
-    const { q } = req.query;
+    const { q, limit } = req.query;
+    const lim = Math.min(parseInt(limit) || 2000, 10000);
     let query = `
       SELECT c.id, c.name, c.logo, c.group_name, p.name as provider_name
       FROM channels c
@@ -127,10 +128,11 @@ export function setupPlanRoutes(app) {
     `;
     const params = [];
     if (q) {
-      query += ' AND c.name LIKE ?';
-      params.push(`%${q}%`);
+      query += ' AND (c.name LIKE ? OR c.group_name LIKE ?)';
+      params.push(`%${q}%`, `%${q}%`);
     }
-    query += ' ORDER BY c.group_name, c.name LIMIT 500';
+    query += ' ORDER BY c.group_name, c.name LIMIT ?';
+    params.push(lim);
     const channels = db.prepare(query).all(...params);
 
     const grouped = {};

@@ -192,7 +192,7 @@
           <button class="btn btn-primary" onclick="showAddUser()">+ Agregar Usuario</button>
         </div>
         <div class="card">
-          <table><thead><tr><th>ID</th><th>Usuario</th><th>Email</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="usersList"></tbody></table>
+          <table><thead><tr><th>ID</th><th>Usuario</th><th>Email</th><th>WhatsApp</th><th>Plan</th><th>Estado</th><th>Acciones</th></tr></thead><tbody id="usersList"></tbody></table>
         </div>
       </div>
 
@@ -280,6 +280,7 @@
       <div class="form-group"><label>Usuario</label><input type="text" id="newUser"></div>
       <div class="form-group"><label>Contraseña</label><input type="password" id="newPass"></div>
       <div class="form-group"><label>Email</label><input type="email" id="newEmail"></div>
+      <div class="form-group"><label>WhatsApp</label><input type="tel" id="newWhatsapp" placeholder="3116040943"></div>
       <div class="form-group"><label>Plan</label>
         <select id="newPlan"></select>
       </div>
@@ -518,12 +519,12 @@
     async function loadUsers() {
       const data = await api('/api/admin/users');
       const html = (data.users || []).map(u =>
-        `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.email || '-'}</td>
+        `<tr><td>${u.id}</td><td>${u.username}</td><td>${u.email || '-'}</td><td>${u.whatsapp || '-'}</td>
         <td><span class="badge badge-info">${u.plan}</span></td>
         <td><span class="badge ${u.is_active ? 'badge-success' : 'badge-danger'}">${u.is_active ? 'Activo' : 'Inactivo'}</span></td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button></td></tr>`
+        <td><button class="btn btn-sm" onclick="sendWA('${u.whatsapp}')" ${!u.whatsapp ? 'disabled' : ''}>📱</button> <button class="btn btn-danger btn-sm" onclick="deleteUser(${u.id})">🗑️</button></td></tr>`
       ).join('');
-      document.getElementById('usersList').innerHTML = html || '<tr><td colspan="6" style="text-align:center;color:#666">No hay usuarios</td></tr>';
+      document.getElementById('usersList').innerHTML = html || '<tr><td colspan="7" style="text-align:center;color:#666">No hay usuarios</td></tr>';
     }
 
     function showAddUser() {
@@ -543,6 +544,7 @@
         username: document.getElementById('newUser').value,
         password: document.getElementById('newPass').value,
         email: document.getElementById('newEmail').value,
+        whatsapp: document.getElementById('newWhatsapp').value,
         plan: document.getElementById('newPlan').value,
         expires_days: parseInt(document.getElementById('newDays').value)
       };
@@ -619,12 +621,17 @@
       document.getElementById('modalPlan').classList.add('active');
     }
 
-    async function loadPlanChannelList() {
-      const data = await api('/api/admin/channels/grouped?q=&limit=500');
+    let planSearchTimeout = null;
+
+    async function loadPlanChannelList(searchQuery) {
+      const q = searchQuery !== undefined ? searchQuery : document.getElementById('planChSearch').value;
+      const data = await api(`/api/admin/channels/grouped?q=${encodeURIComponent(q)}&limit=2000`);
       const groups = data.groups || {};
       const container = document.getElementById('planChannelList');
       let html = '';
-      for (const [group, channels] of Object.entries(groups)) {
+      const groupKeys = Object.keys(groups).sort();
+      for (const group of groupKeys) {
+        const channels = groups[group];
         html += `<div class="cat-group-header">${group} (${channels.length})</div>`;
         for (const ch of channels) {
           const checked = selectedPlanChannels.has(ch.id) ? 'checked' : '';
@@ -635,10 +642,20 @@
     }
 
     function filterPlanChannels() {
-      const q = document.getElementById('planChSearch').value.toLowerCase();
-      document.querySelectorAll('#planChannelList .plan-channel-item').forEach(el => {
-        el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
-      });
+      clearTimeout(planSearchTimeout);
+      planSearchTimeout = setTimeout(() => {
+        const q = document.getElementById('planChSearch').value.trim();
+        if (q.length >= 2) {
+          loadPlanChannelList(q);
+        } else if (q.length === 0) {
+          loadPlanChannelList('');
+        } else {
+          // For 1 char, filter client-side on already loaded list
+          document.querySelectorAll('#planChannelList .plan-channel-item').forEach(el => {
+            el.style.display = el.textContent.toLowerCase().includes(q) ? '' : 'none';
+          });
+        }
+      }, 300);
     }
 
     function togglePlanChannel(id) {
@@ -702,8 +719,12 @@
 
     // ── WHATSAPP ──
     async function loadWhatsApp() {
-      const data = await api('/api/admin/whatsapp');
-      updateWAStatus(data);
+      try {
+        const data = await api('/wa/status');
+        updateWAStatus({ session: { status: data.ready ? 'connected' : data.hasQr ? 'waiting_scan' : 'disconnected', phone: data.phone } });
+      } catch (e) {
+        updateWAStatus({ session: null });
+      }
       loadWAMessages();
     }
 
@@ -725,55 +746,54 @@
     }
 
     async function generateQR() {
-      document.getElementById('qrPlaceholder').innerHTML = '<div class="qr-loading"></div><p style="color:#888">Generando código QR...</p>';
-      document.getElementById('qrImage').style.display = 'none';
-      
-      const res = await api('/api/admin/whatsapp/qr', { method: 'POST', body: JSON.stringify({}) });
-      if (res.success) {
-        toast('QR generado. Escanea con WhatsApp.', 'success');
-        // Poll for QR image
-        pollQRStatus(res.sessionId);
-      } else {
-        toast(res.error || 'Error', 'error');
-      }
+      // Open QR page in new tab (auto-refreshes every 25s)
+      window.open('/wa/qr', '_blank');
+      toast('Abriendo QR en nueva pestaña... Escanea con WhatsApp.', 'success');
+      // Start polling status
+      pollWAStatus();
     }
 
-    async function pollQRStatus(sessionId) {
+    async function pollWAStatus() {
       let attempts = 0;
       const interval = setInterval(async () => {
         attempts++;
-        const data = await api('/api/admin/whatsapp/status');
-        updateWAStatus(data);
-        
-        if (data.status === 'connected') {
-          clearInterval(interval);
-          toast('¡WhatsApp conectado!', 'success');
-          document.getElementById('qrPlaceholder').innerHTML = '<div style="font-size:48px">✅</div><p style="color:#25d366">WhatsApp conectado correctamente</p>';
-          return;
-        }
+        try {
+          const data = await api('/wa/status');
+          if (data.ready) {
+            clearInterval(interval);
+            updateWAStatus({ session: { status: 'connected', phone: data.phone } });
+            toast('¡WhatsApp conectado! +' + data.phone, 'success');
+            document.getElementById('qrPlaceholder').innerHTML = '<div style="font-size:48px">✅</div><p style="color:#25d366">WhatsApp conectado correctamente</p>';
+            return;
+          }
+        } catch (e) {}
         
         if (attempts > 60) {
           clearInterval(interval);
           document.getElementById('qrPlaceholder').innerHTML = '<div style="font-size:48px">⏰</div><p style="color:#ffab40">Tiempo agotado. Intenta de nuevo.</p>';
         }
-      }, 2000);
+      }, 3000);
     }
 
     async function checkWAStatus() {
-      const data = await api('/api/admin/whatsapp/status');
-      updateWAStatus({ session: data });
-      if (data.status === 'connected') {
-        toast('WhatsApp conectado: ' + (data.phone || ''), 'success');
+      const data = await api('/wa/status');
+      if (data.ready) {
+        updateWAStatus({ session: { status: 'connected', phone: data.phone } });
+        toast('WhatsApp conectado: +' + data.phone, 'success');
+      } else if (data.hasQr) {
+        updateWAStatus({ session: { status: 'waiting_scan' } });
+        toast('QR generado — escanea con WhatsApp', 'info');
       } else {
-        toast('Estado: ' + data.status, 'error');
+        updateWAStatus({ session: { status: 'disconnected' } });
+        toast('WA desconectado', 'error');
       }
     }
 
     async function disconnectWA() {
       if (!confirm('¿Desconectar WhatsApp?')) return;
-      await api('/api/admin/whatsapp/disconnect', { method: 'POST', body: JSON.stringify({}) });
-      toast('WhatsApp desconectado', 'success');
-      loadWhatsApp();
+      await api('/wa/restart', { method: 'POST', body: JSON.stringify({}) });
+      toast('Reiniciando WA...', 'info');
+      setTimeout(loadWhatsApp, 3000);
     }
 
     async function loadWAMessages() {
@@ -795,13 +815,26 @@
       const message = document.getElementById('waMessage').value.trim();
       if (!to || !message) { toast('Número y mensaje requeridos', 'error'); return; }
       
-      const res = await api('/api/admin/whatsapp/send', { method: 'POST', body: JSON.stringify({ to, message }) });
-      if (res.success) {
+      const res = await api('/wa/send', { method: 'POST', body: JSON.stringify({ phone: to, message }) });
+      if (res.ok) {
         toast('Mensaje enviado', 'success');
         document.getElementById('waMessage').value = '';
         loadWAMessages();
       } else {
-        toast(res.error || 'Error', 'error');
+        toast('Error al enviar', 'error');
+      }
+    }
+
+    // Enviar WhatsApp directo desde lista de usuarios
+    async function sendWA(phone) {
+      if (!phone) { toast('Sin número de WhatsApp', 'error'); return; }
+      const message = prompt('Mensaje a enviar:');
+      if (!message) return;
+      const res = await api('/wa/send', { method: 'POST', body: JSON.stringify({ phone, message }) });
+      if (res.ok) {
+        toast('Mensaje enviado a ' + phone, 'success');
+      } else {
+        toast('Error al enviar', 'error');
       }
     }
 
