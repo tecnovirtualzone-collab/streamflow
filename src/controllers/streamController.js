@@ -102,12 +102,14 @@ export function setupChannelRoutes(app) {
     const providerFilter = req.query.provider || null;
     const search = req.query.search || null;
     
+    console.log('DEBUG query:', JSON.stringify({page, limit, providerFilter, search, rawQuery: req.query}));
+    
     let whereClause = 'WHERE c.is_active = 1';
     const params = [];
     
     if (providerFilter) {
-      whereClause += ' AND p.name = ?';
-      params.push(providerFilter);
+      whereClause += ' AND p.name LIKE ?';
+      params.push(`%${providerFilter}%`);
     }
     
     if (search) {
@@ -122,7 +124,7 @@ export function setupChannelRoutes(app) {
       JOIN providers p ON p.id = c.provider_id
       ${whereClause}
       ORDER BY 
-        CASE WHEN p.name = 'Free IPTV' THEN 0 ELSE 1 END,
+        CASE WHEN p.name LIKE '%Free%' THEN 0 ELSE 1 END,
         c.group_name, c.name
       LIMIT ? OFFSET ?
     `).all(...params, limit, offset);
