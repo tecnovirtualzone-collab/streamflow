@@ -31,6 +31,7 @@ export function runMigrations() {
       plan TEXT DEFAULT 'basico',
       max_channels INTEGER DEFAULT 40,
       is_active INTEGER DEFAULT 1,
+      access_token TEXT DEFAULT '',
       expires_at INTEGER,
       created_at INTEGER DEFAULT (strftime('%s', 'now'))
     );
@@ -190,4 +191,12 @@ export function setSetting(key, value) {
   ).run(key, value);
 }
 
-export default db;
+// Generate unique access token for a user
+export function generateAccessToken() {
+  return crypto.randomBytes(32).toString('hex');
+}
+
+export function getUserByToken(token) {
+  if (!token) return null;
+  return db.prepare('SELECT * FROM users WHERE access_token = ? AND is_active = 1').get(token);
+}

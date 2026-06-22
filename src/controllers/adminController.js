@@ -1,10 +1,10 @@
-import db from '../database/db.js';
+import db, { generateAccessToken } from '../database/db.js';
 import { authMiddleware } from '../middleware/auth.js';
 
 export function setupAdminRoutes(app) {
   // Get all users
   app.get('/api/admin/users', authMiddleware, (req, res) => {
-    const users = db.prepare('SELECT id, username, email, whatsapp, plan, max_channels, is_active, created_at, expires_at FROM users ORDER BY created_at DESC').all();
+    const users = db.prepare('SELECT id, username, email, whatsapp, plan, max_channels, is_active, access_token, created_at, expires_at FROM users ORDER BY created_at DESC').all();
     res.json({ users });
   });
 
@@ -20,12 +20,13 @@ export function setupAdminRoutes(app) {
     const hashedPassword = await bcrypt.hash(password, 10);
     const expiresAt = expires_days ? Math.floor(Date.now() / 1000) + (expires_days * 86400) : 0;
     const planChannels = { basico: 40, estandar: 70, premium: 100 }[plan] || 40;
+    const accessToken = generateAccessToken();
 
     const result = db.prepare(
-      'INSERT INTO users (username, password, email, whatsapp, plan, max_channels, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?)'
-    ).run(username, hashedPassword, email || '', whatsapp || '', plan || 'basico', max_channels || planChannels, expiresAt);
+      'INSERT INTO users (username, password, email, whatsapp, plan, max_channels, access_token, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(username, hashedPassword, email || '', whatsapp || '', plan || 'basico', max_channels || planChannels, accessToken, expiresAt);
 
-    res.status(201).json({ id: result.lastInsertRowid, username, plan: plan || 'basico' });
+    res.status(201).json({ id: result.lastInsertRowid, username, plan: plan || 'basico', access_token: accessToken });
   });
 
   // Delete user

@@ -167,7 +167,7 @@ app.post('/wa/send', async (req, res) => {
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).json({ error: 'phone y message requeridos' });
   const ok = await waSend(phone, message);
-  res.json({ ok });
+  res.json({ ok, success: ok });
 });
 
 // Reiniciar WA
