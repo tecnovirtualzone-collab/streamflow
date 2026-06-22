@@ -99,17 +99,35 @@ export function setupChannelRoutes(app) {
     const page = parseInt(req.query.page) || 1;
     const limit = Math.min(parseInt(req.query.limit) || 100, 500);
     const offset = (page - 1) * limit;
+    const providerFilter = req.query.provider || null;
+    const search = req.query.search || null;
     
+    let whereClause = 'WHERE c.is_active = 1';
+    const params = [];
+    
+    if (providerFilter) {
+      whereClause += ' AND p.name = ?';
+      params.push(providerFilter);
+    }
+    
+    if (search) {
+      whereClause += ' AND (c.name LIKE ? OR c.group_name LIKE ?)';
+      params.push(`%${search}%`, `%${search}%`);
+    }
+    
+    // Ordenar: primero canales libres (Free IPTV), luego por grupo, luego por nombre
     const channels = db.prepare(`
       SELECT c.id, c.name, c.logo, c.group_name, p.name as provider_name
       FROM channels c
       JOIN providers p ON p.id = c.provider_id
-      WHERE c.is_active = 1
-      ORDER BY c.group_name, c.name
+      ${whereClause}
+      ORDER BY 
+        CASE WHEN p.name = 'Free IPTV' THEN 0 ELSE 1 END,
+        c.group_name, c.name
       LIMIT ? OFFSET ?
-    `).all(limit, offset);
+    `).all(...params, limit, offset);
     
-    const total = db.prepare('SELECT COUNT(*) as count FROM channels WHERE is_active = 1').get().count;
+    const total = db.prepare(`SELECT COUNT(*) as count FROM channels c JOIN providers p ON p.id = c.provider_id ${whereClause}`).get(...params).count;
     
     res.json({ channels, count: channels.length, total, page, totalPages: Math.ceil(total / limit) });
   });

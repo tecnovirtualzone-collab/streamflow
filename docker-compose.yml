@@ -21,6 +21,10 @@ services:
       - NODE_ENV=production
     volumes:
       - streamflow_v5_data:/data
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+      - 8.8.4.4
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/health"]
       interval: 30s

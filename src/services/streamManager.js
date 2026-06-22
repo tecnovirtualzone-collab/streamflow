@@ -32,7 +32,25 @@ class StreamManager {
 
     try {
       // FFmpeg relay: read stream and output to MPEG-TS for HLS/player
+      // Headers adaptativos según el proveedor
+      const isFreeIPTV = streamUrl.includes('138.121.15.230') || 
+                         streamUrl.includes('iptv-org') ||
+                         !streamUrl.includes('ultratvsv.site');
+      
+      let headerStr;
+      if (isFreeIPTV) {
+        // Canales libres - headers genéricos sin referer específico
+        headerStr = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36\r\nAccept: */*\r\nConnection: keep-alive\r\n';
+      } else {
+        // Proveedor Red4TV - requiere referer específico
+        headerStr = 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36\r\nReferer: http://red4tv.lat:80/\r\n';
+      }
+
       const ffmpegArgs = [
+        '-headers', headerStr,
+        '-reconnect', '1',
+        '-reconnect_streamed', '1',
+        '-reconnect_delay_max', '5',
         '-i', streamUrl,
         '-c', 'copy',           // Copy codec (no transcoding = low CPU)
         '-f', 'mpegts',
@@ -111,8 +129,9 @@ class StreamManager {
    * Find existing stream for same channel + IP (Smart Relay deduplication)
    */
   findExistingStream(channelId, ip) {
+    const chId = Number(channelId);
     for (const stream of this.streams.values()) {
-      if (stream.channelId === channelId && stream.ip === ip) {
+      if (stream.channelId === chId && stream.ip === ip) {
         return stream;
       }
     }

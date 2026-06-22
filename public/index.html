@@ -158,13 +158,19 @@
       <div class="page" id="page-channels">
         <div class="page-header">
           <h2>📺 Canales <span class="channel-count-badge" id="channelCount">0</span></h2>
-          <button class="btn btn-primary" onclick="loadChannels()">🔄 Recargar</button>
+          <button class="btn btn-primary" onclick="loadChannels(1)">🔄 Recargar</button>
         </div>
-        <div class="search-box">
-          <input type="text" id="channelSearch" placeholder="Buscar canal..." oninput="searchChannels()">
+        <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+          <input type="text" id="channelSearch" placeholder="🔍 Buscar canal..." oninput="searchChannels()" style="flex:1;min-width:200px;padding:10px 14px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#e0e0e0">
+          <select id="channelProviderFilter" onchange="filterByProvider()" style="padding:10px 14px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#e0e0e0;min-width:180px">
+            <option value="">Todos los proveedores</option>
+            <option value="Free IPTV">🆓 Canales Libres</option>
+            <option value="Red4TV Premium">🔴 Red4TV</option>
+          </select>
         </div>
         <div class="card">
           <table><thead><tr><th>ID</th><th>Nombre</th><th>Grupo</th><th>Proveedor</th></tr></thead><tbody id="channelsList"></tbody></table>
+          <div id="channelPagination"></div>
         </div>
       </div>
 
@@ -400,24 +406,70 @@
     }
 
     // ── CHANNELS ──
-    async function loadChannels() {
-      const data = await api('/api/channels');
+    let currentPage = 1;
+    let totalPages = 1;
+    let currentSearch = '';
+    let currentProvider = '';
+
+    async function loadChannels(page = 1) {
+      currentPage = page;
+      const params = new URLSearchParams({
+        page: page,
+        limit: 100,
+        search: currentSearch,
+        provider: currentProvider
+      });
+      const data = await api(`/api/channels?${params}`);
       allChannels = data.channels || [];
-      document.getElementById('channelCount').textContent = allChannels.length;
+      totalPages = data.totalPages || 1;
+      document.getElementById('channelCount').textContent = `${data.total} canales`;
       renderChannels(allChannels);
+      renderPagination();
     }
 
     function renderChannels(channels) {
-      const html = channels.slice(0, 500).map(c =>
-        `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.group_name || '-'}</td><td>${c.provider_name || '-'}</td></tr>`
+      const html = channels.map(c => 
+        `<tr><td>${c.id}</td><td>${c.name}</td><td>${c.group_name || '-'}</td><td><span class="badge ${c.provider_name === 'Free IPTV' ? 'badge-success' : 'badge-info'}">${c.provider_name || '-'}</span></td></tr>`
       ).join('');
       document.getElementById('channelsList').innerHTML = html || '<tr><td colspan="4" style="text-align:center;color:#666">No hay canales</td></tr>';
     }
 
+    function renderPagination() {
+      const container = document.getElementById('channelPagination');
+      if (totalPages <= 1) { container.innerHTML = ''; return; }
+      
+      let html = '<div style="display:flex;gap:4px;justify-content:center;margin-top:12px;flex-wrap:wrap">';
+      
+      // Anterior
+      html += `<button class="btn btn-sm ${currentPage === 1 ? '' : 'btn-primary'}" onclick="loadChannels(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>◀ Anterior</button>`;
+      
+      // Páginas
+      const start = Math.max(1, currentPage - 3);
+      const end = Math.min(totalPages, currentPage + 3);
+      
+      if (start > 1) html += `<button class="btn btn-sm" onclick="loadChannels(1)">1</button>${start > 2 ? '<span style="padding:4px 8px;color:#666">...</span>' : ''}`;
+      
+      for (let i = start; i <= end; i++) {
+        html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : ''}" onclick="loadChannels(${i})">${i}</button>`;
+      }
+      
+      if (end < totalPages) html += `${end < totalPages - 1 ? '<span style="padding:4px 8px;color:#666">...</span>' : ''}<button class="btn btn-sm" onclick="loadChannels(${totalPages})">${totalPages}</button>`;
+      
+      // Siguiente
+      html += `<button class="btn btn-sm ${currentPage === totalPages ? '' : 'btn-primary'}" onclick="loadChannels(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>Siguiente ▶</button>`;
+      
+      html += `<span style="padding:4px 12px;color:#888;font-size:13px">Página ${currentPage} de ${totalPages}</span></div>`;
+      container.innerHTML = html;
+    }
+
     function searchChannels() {
-      const q = document.getElementById('channelSearch').value.toLowerCase();
-      const filtered = allChannels.filter(c => c.name.toLowerCase().includes(q) || (c.group_name || '').toLowerCase().includes(q));
-      renderChannels(filtered);
+      currentSearch = document.getElementById('channelSearch').value;
+      loadChannels(1);
+    }
+
+    function filterByProvider() {
+      currentProvider = document.getElementById('channelProviderFilter').value;
+      loadChannels(1);
     }
 
     // ── PROVIDERS ──
