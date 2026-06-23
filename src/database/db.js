@@ -148,7 +148,25 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
   `);
 
-  // Default settings
+  // ── MIGRATIONS (run every time, safe to re-run) ──
+  // Add access_token to users if not exists
+  const userCols = db.prepare("PRAGMA table_info(users)").all();
+  if (!userCols.find(c => c.name === 'access_token')) {
+    db.exec("ALTER TABLE users ADD COLUMN access_token TEXT DEFAULT ''");
+    console.log('✅ Migration: added access_token to users');
+  }
+  // Generate access_token for existing users that don't have one
+  const usersWithoutToken = db.prepare("SELECT id FROM users WHERE access_token = '' OR access_token IS NULL").all();
+  if (usersWithoutToken.length > 0) {
+    const updateToken = db.prepare("UPDATE users SET access_token = ? WHERE id = ?");
+    const gen = db.transaction(() => {
+      for (const u of usersWithoutToken) {
+        updateToken.run(crypto.randomBytes(32).toString('hex'), u.id);
+      }
+    });
+    gen();
+    console.log(`✅ Migration: generated access_token for ${usersWithoutToken.length} existing users`);
+  }
   const defaultSettings = [
     ['app_name', 'StreamFlow'],
     ['stream_method', 'ffmpeg'],
