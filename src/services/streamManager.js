@@ -12,7 +12,7 @@ class StreamManager {
    * Start a new stream relay via FFmpeg
    * Key feature: deduplication - same channel from same IP reuses the same stream
    */
-  async startStream({ userId, username, channelId, channelName, streamUrl, ip }) {
+  async startStream({ userId, username, channelId, channelName, streamUrl, ip, deviceId }) {
     // Check if there's already a stream for this channel + IP (Smart Relay)
     const existing = this.findExistingStream(channelId, ip);
     if (existing) {
@@ -26,9 +26,12 @@ class StreamManager {
     const plan = db.prepare('SELECT max_connections FROM plans WHERE name = ?').get(planName);
     const maxDevices = plan?.max_connections || 1;
 
-    // Check concurrent connection limit for this user (by IP = device)
-    const userActiveIps = this.getUserActiveIps(userId);
-    if (userActiveIps.length >= maxDevices && !userActiveIps.includes(ip)) {
+    // Device identification: use device_id if provided, fallback to IP
+    const devId = deviceId || ip;
+
+    // Check concurrent connection limit for this user (by device)
+    const userActiveDevices = this.getUserActiveDevices(userId);
+    if (userActiveDevices.length >= maxDevices && !userActiveDevices.includes(devId)) {
       return { streamId: null, status: 'error', error: `Limite de dispositivos alcanzado (${maxDevices}). Cierra la reproduccion en otro dispositivo para continuar.` };
     }
 
@@ -83,6 +86,7 @@ class StreamManager {
         startTime: Date.now(),
         lastActivity: Date.now(),
         ip,
+        deviceId: devId,
         output: ffmpeg.stdout
       };
 
@@ -164,16 +168,16 @@ class StreamManager {
   }
 
   /**
-   * Get unique IPs (devices) a user is streaming from
+   * Get unique device IDs a user is streaming from
    */
-  getUserActiveIps(userId) {
-    const ips = new Set();
+  getUserActiveDevices(userId) {
+    const devices = new Set();
     for (const stream of this.streams.values()) {
       if (stream.userId === userId) {
-        ips.add(stream.ip);
+        devices.add(stream.deviceId || stream.ip);
       }
     }
-    return Array.from(ips);
+    return Array.from(devices);
   }
 
   /**

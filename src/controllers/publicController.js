@@ -162,7 +162,8 @@ export function setupPublicRoutes(app) {
         channelId: channel.id,
         channelName: channel.name,
         streamUrl,
-        ip
+        ip,
+        deviceId: req.query.device_id || ip
       });
 
       if (result.status === 'error') {
