@@ -61,16 +61,27 @@ async function waSend(phone, text) {
       clean = '57' + clean;
     }
     const chatId = clean + '@c.us';
-    const isRegistered = await waClient.isRegisteredUser(chatId).catch(() => false);
-    if (!isRegistered) {
-      console.log('❌ No registrado en WA:', clean);
-      return false;
+
+    // Intentar enviar directamente (isRegisteredUser falla con "No LID" en algunos casos)
+    try {
+      await waClient.sendMessage(chatId, text);
+      console.log('✅ WA enviado a', clean);
+      return true;
+    } catch (sendErr) {
+      // Si falla, verificar si está registrado e intentar de nuevo
+      console.log('⚠️ Primer intento fallido para', clean, ':', sendErr.message?.substring(0, 80));
+      const isRegistered = await waClient.isRegisteredUser(chatId).catch(() => false);
+      if (!isRegistered) {
+        console.log('❌ No registrado en WA:', clean);
+        return false;
+      }
+      // Reintentar
+      await waClient.sendMessage(chatId, text);
+      console.log('✅ WA enviado (2do intento) a', clean);
+      return true;
     }
-    await waClient.sendMessage(chatId, text);
-    console.log('✅ WA enviado a', clean);
-    return true;
   } catch (e) {
-    console.error('❌ WA send:', e.message);
+    console.error('❌ WA send:', e.message?.substring(0, 100));
     return false;
   }
 }
