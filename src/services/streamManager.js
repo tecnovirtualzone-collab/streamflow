@@ -20,9 +20,21 @@ class StreamManager {
       return { streamId: existing.id, status: 'reused' };
     }
 
-    // Check concurrent connection limit for this user
+    // Get user's plan max_connections limit
+    const user = db.prepare('SELECT plan FROM users WHERE id = ?').get(userId);
+    const planName = user?.plan || 'basico';
+    const plan = db.prepare('SELECT max_connections FROM plans WHERE name = ?').get(planName);
+    const maxDevices = plan?.max_connections || 1;
+
+    // Check concurrent connection limit for this user (by IP = device)
+    const userActiveIps = this.getUserActiveIps(userId);
+    if (userActiveIps.length >= maxDevices && !userActiveIps.includes(ip)) {
+      return { streamId: null, status: 'error', error: `Limite de dispositivos alcanzado (${maxDevices}). Cierra la reproduccion en otro dispositivo para continuar.` };
+    }
+
+    // Also check total concurrent streams per user (safety)
     const userStreams = this.getUserStreams(userId);
-    if (userStreams.length >= STREAM_MAX_CONCURRENT) {
+    if (userStreams.length >= maxDevices) {
       // Kill oldest stream for this user
       const oldest = userStreams[0];
       await this.stopStream(oldest.id);
@@ -149,6 +161,19 @@ class StreamManager {
       }
     }
     return result.sort((a, b) => a.startTime - b.startTime);
+  }
+
+  /**
+   * Get unique IPs (devices) a user is streaming from
+   */
+  getUserActiveIps(userId) {
+    const ips = new Set();
+    for (const stream of this.streams.values()) {
+      if (stream.userId === userId) {
+        ips.add(stream.ip);
+      }
+    }
+    return Array.from(ips);
   }
 
   /**

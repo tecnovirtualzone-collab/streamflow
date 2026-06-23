@@ -118,10 +118,12 @@ export function setupPublicRoutes(app) {
 
   // Get user info by token
   app.get('/api/public/me', publicAuth, (req, res) => {
+    const plan = db.prepare('SELECT max_connections FROM plans WHERE name = ?').get(req.user.plan);
     res.json({
       username: req.user.username,
       plan: req.user.plan,
       max_channels: req.user.max_channels,
+      max_devices: plan?.max_connections || 1,
       expires_at: req.user.expires_at
     });
   });
@@ -164,6 +166,9 @@ export function setupPublicRoutes(app) {
       });
 
       if (result.status === 'error') {
+        if (result.error && result.error.includes('Limite de dispositivos')) {
+          return res.status(429).json({ error: result.error });
+        }
         return res.status(500).json({ error: 'Error al iniciar stream' });
       }
 
