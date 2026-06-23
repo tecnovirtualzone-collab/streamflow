@@ -598,7 +598,7 @@
       // Send via WA microservice
       const res = await api('/wa/send', {
         method: 'POST',
-        body: JSON.stringify({ phone: to, message: msg })
+        body: JSON.stringify({ phone: phone, message: msg })
       });
       if (res.success) {
         toast('Mensaje enviado por WhatsApp', 'success');
