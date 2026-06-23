@@ -594,7 +594,10 @@
         toast('⚠️ WhatsApp no está conectado. Escanea el QR en la pestaña WhatsApp del panel.', 'error');
         return;
       }
-      const msg = `¡Hola ${username}! 🎉\n\nTu acceso a StreamFlow está listo:\n\n📺 URL de playlist:\n${m3uUrl}\n\n📱 Instrucciones:\n1. Abre tu app de IPTV (TiviMate, IPTV Smarters, etc.)\n2. Agrega una nueva playlist\n3. Pega la URL de arriba\n4. ¡Disfruta!\n\n⏰ Tu acceso vence en 30 días.`;
+      // Shorten URL for cleaner message
+      const shortenRes = await api('/api/shorten', { method: 'POST', body: JSON.stringify({ url: m3uUrl }) });
+      const shortUrl = shortenRes.shortUrl || m3uUrl;
+      const msg = `¡Hola ${username}! 🎉\n\nTu acceso a StreamFlow está listo:\n\n📺 URL de playlist:\n${shortUrl}\n\n📱 Instrucciones:\n1. Abre tu app de IPTV (TiviMate, IPTV Smarters, etc.)\n2. Agrega una nueva playlist\n3. Pega la URL de arriba\n4. ¡Disfruta!\n\n⏰ Tu acceso vence en 30 días.`;
       // Send via WA microservice
       const res = await api('/wa/send', {
         method: 'POST',

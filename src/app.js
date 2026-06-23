@@ -12,6 +12,7 @@ import { setupAdminRoutes } from './controllers/adminController.js';
 import { setupPlanRoutes } from './controllers/planController.js';
 import { setupWhatsAppRoutes } from './controllers/whatsappController.js';
 import { setupPublicRoutes } from './controllers/publicController.js';
+import { setupShortenerRoutes } from './controllers/shortenerController.js';
 import streamManager from './services/streamManager.js';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 
@@ -43,6 +44,7 @@ setupAdminRoutes(app);
 setupPlanRoutes(app);
 setupWhatsAppRoutes(app);
 setupPublicRoutes(app);
+setupShortenerRoutes(app);
 
 // WA Service proxy (microservicio WA en puerto 5002)
 const WA_PORT = process.env.WA_PORT || 5002;
