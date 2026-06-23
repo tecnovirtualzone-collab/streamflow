@@ -178,7 +178,7 @@ app.post('/wa/send', async (req, res) => {
   const { phone, message } = req.body;
   if (!phone || !message) return res.status(400).json({ error: 'phone y message requeridos' });
   const ok = await waSend(phone, message);
-  res.json({ ok, success: ok });
+  res.json({ ok, success: ok, error: ok ? null : 'No se pudo enviar. Verifica que el número tenga WhatsApp.' });
 });
 
 // Reiniciar WA
