@@ -55,6 +55,34 @@ export function setupAdminRoutes(app) {
     });
   });
 
+  // Run channel health check (sample mode for quick response)
+  app.post('/api/admin/channels/check', authMiddleware, async (req, res) => {
+    try {
+      const { exec } = await import('child_process');
+      const { promisify } = await import('util');
+      const execAsync = promisify(exec);
+      
+      const { stdout } = await execAsync(
+        'cd /root/streamflow && node scripts/check_channels.mjs --sample',
+        { timeout: 120000 }
+      );
+      
+      const working = stdout.match(/Funcionando: (\d+)/)?.[1] || '?';
+      const failed = stdout.match(/Muertos: (\d+)/)?.[1] || '?';
+      const total = stdout.match(/Verificados: (\d+)/)?.[1] || '?';
+      
+      res.json({ 
+        success: true, 
+        working: parseInt(working),
+        failed: parseInt(failed),
+        total: parseInt(total),
+        output: stdout
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message || 'Error running check' });
+    }
+  });
+
   // Import M3U playlist
   app.post('/api/admin/import-m3u', authMiddleware, async (req, res) => {
     const { provider_id, m3u_content } = req.body;

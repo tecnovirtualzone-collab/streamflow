@@ -159,6 +159,7 @@
         <div class="page-header">
           <h2>📺 Canales <span class="channel-count-badge" id="channelCount">0</span></h2>
           <button class="btn btn-primary" onclick="loadChannels(1)">🔄 Recargar</button>
+          <button class="btn btn-success" onclick="checkChannels()" id="btnCheckChannels">✅ Verificar Canales</button>
         </div>
         <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
           <input type="text" id="channelSearch" placeholder="🔍 Buscar canal..." oninput="searchChannels()" style="flex:1;min-width:200px;padding:10px 14px;background:#0f0f1a;border:1px solid #2a2a4a;border-radius:8px;color:#e0e0e0">
@@ -426,6 +427,25 @@
       document.getElementById('channelCount').textContent = `${data.total} canales`;
       renderChannels(allChannels);
       renderPagination();
+    }
+
+    async function checkChannels() {
+      const btn = document.getElementById('btnCheckChannels');
+      if (btn) { btn.disabled = true; btn.textContent = '⏳ Verificando...'; }
+      toast('Verificando canales (muestra de 50)...', 'info');
+      try {
+        const res = await api('/api/admin/channels/check', { method: 'POST', body: '{}' });
+        if (res.success) {
+          const pct = res.total > 0 ? (res.working / res.total * 100).toFixed(1) : 0;
+          toast(`✅ Verificación: ${res.working}/${res.total} funcionando (${pct}%) | ${res.failed} muertos`, 'success');
+        } else {
+          toast('Error en verificación', 'error');
+        }
+      } catch (e) {
+        toast('Error: ' + (e.message || 'desconocido'), 'error');
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = '✅ Verificar Canales'; }
+      }
     }
 
     function renderChannels(channels) {
