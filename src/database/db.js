@@ -200,3 +200,5 @@ export function getUserByToken(token) {
   if (!token) return null;
   return db.prepare('SELECT * FROM users WHERE access_token = ? AND is_active = 1').get(token);
 }
+
+export default db;
