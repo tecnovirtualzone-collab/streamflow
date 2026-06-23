@@ -1,4 +1,4 @@
-import db, { getUserByToken } from '../database/db.js';
+import db, { getUserByToken, getBackupsForChannel, getAliveChannels } from '../database/db.js';
 import streamManager from '../services/streamManager.js';
 import { URL } from 'url';
 
@@ -26,39 +26,78 @@ export function setupPublicRoutes(app) {
   app.get('/api/public/m3u', publicAuth, (req, res) => {
     const user = req.user;
 
-    // Get channels for user's plan
+    // Get channels for user's plan - only alive channels
     let channels;
     if (user.plan === 'premium') {
-      // Premium gets all active channels
+      // Premium gets all active+alive channels
       channels = db.prepare(`
         SELECT c.id, c.name, c.logo, c.group_name, c.stream_url, p.name as provider_name
         FROM channels c
         JOIN providers p ON p.id = c.provider_id
+        LEFT JOIN channel_health h ON h.channel_id = c.id
         WHERE c.is_active = 1 AND p.is_active = 1
+        AND (h.is_alive IS NULL OR h.is_alive = 1)
         ORDER BY c.group_name, c.name
         LIMIT ?
       `).all(user.max_channels || 500);
     } else {
-      // Get channels assigned to user's plan
+      // Get channels assigned to user's plan that are alive
       channels = db.prepare(`
         SELECT c.id, c.name, c.logo, c.group_name, c.stream_url, p.name as provider_name
         FROM plan_channels pc
         JOIN channels c ON c.id = pc.channel_id
         JOIN plans pl ON pl.id = pc.plan_id
         JOIN providers p ON p.id = c.provider_id
+        LEFT JOIN channel_health h ON h.channel_id = c.id
         WHERE pl.name = ? AND c.is_active = 1 AND p.is_active = 1
+        AND (h.is_alive IS NULL OR h.is_alive = 1)
         ORDER BY c.group_name, c.name
         LIMIT ?
       `).all(user.plan, user.max_channels || 100);
     }
 
-    // If no plan channels assigned, fall back to free channels
+    // If not enough alive channels, fill with backups
+    if (channels.length < (user.max_channels || 40)) {
+      const needed = (user.max_channels || 40) - channels.length;
+      const existingIds = channels.map(c => c.id).join(',');
+
+      let backupChannels = [];
+      if (existingIds.length > 0) {
+        backupChannels = db.prepare(`
+          SELECT DISTINCT c.id, c.name, c.logo, c.group_name, c.stream_url, p.name as provider_name
+          FROM channel_backups cb
+          JOIN channels c ON c.id = cb.backup_channel_id
+          JOIN providers p ON p.id = c.provider_id
+          LEFT JOIN channel_health h ON h.channel_id = c.id
+          WHERE cb.channel_id IN (SELECT channel_id FROM plan_channels WHERE plan_id = (
+            SELECT id FROM plans WHERE name = ?
+          ))
+          AND c.is_active = 1 AND p.is_active = 1
+          AND (h.is_alive IS NULL OR h.is_alive = 1)
+          AND c.id NOT IN (${existingIds})
+          ORDER BY cb.priority
+          LIMIT ?
+        `).all(user.plan, needed);
+      }
+
+      const existingSet = new Set(channels.map(c => c.id));
+      for (const bc of backupChannels) {
+        if (!existingSet.has(bc.id)) {
+          channels.push(bc);
+          existingSet.add(bc.id);
+        }
+      }
+    }
+
+    // If still no channels, fall back to any alive channels
     if (!channels || channels.length === 0) {
       channels = db.prepare(`
         SELECT c.id, c.name, c.logo, c.group_name, c.stream_url, p.name as provider_name
         FROM channels c
         JOIN providers p ON p.id = c.provider_id
-        WHERE c.is_active = 1 AND p.is_active = 1 AND p.name LIKE '%Free%'
+        LEFT JOIN channel_health h ON h.channel_id = c.id
+        WHERE c.is_active = 1 AND p.is_active = 1
+        AND (h.is_alive IS NULL OR h.is_alive = 1)
         ORDER BY c.group_name, c.name
         LIMIT ?
       `).all(user.max_channels || 40);

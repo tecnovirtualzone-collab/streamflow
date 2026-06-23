@@ -146,6 +146,33 @@ export function runMigrations() {
     CREATE INDEX IF NOT EXISTS idx_plan_channels_ch ON plan_channels(channel_id);
     CREATE INDEX IF NOT EXISTS idx_wa_session ON whatsapp_sessions(session_id);
     CREATE INDEX IF NOT EXISTS idx_channels_name ON channels(name);
+
+    -- Channel health tracking
+    CREATE TABLE IF NOT EXISTS channel_health (
+      channel_id INTEGER PRIMARY KEY,
+      last_check INTEGER DEFAULT 0,
+      last_success INTEGER DEFAULT 0,
+      is_alive INTEGER DEFAULT 1,
+      fail_count INTEGER DEFAULT 0,
+      response_time_ms INTEGER DEFAULT 0,
+      FOREIGN KEY (channel_id) REFERENCES channels(id)
+    );
+
+    -- Backup channels: for each channel, store ordered replacements
+    CREATE TABLE IF NOT EXISTS channel_backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      channel_id INTEGER NOT NULL,
+      backup_channel_id INTEGER NOT NULL,
+      priority INTEGER DEFAULT 0,
+      FOREIGN KEY (channel_id) REFERENCES channels(id),
+      FOREIGN KEY (backup_channel_id) REFERENCES channels(id),
+      UNIQUE(channel_id, backup_channel_id)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_health_alive ON channel_health(is_alive);
+    CREATE INDEX IF NOT EXISTS idx_health_check ON channel_health(last_check);
+    CREATE INDEX IF NOT EXISTS idx_backups_channel ON channel_backups(channel_id);
+    CREATE INDEX IF NOT EXISTS idx_backups_priority ON channel_backups(channel_id, priority);
   `);
 
   // ── MIGRATIONS (run every time, safe to re-run) ──
@@ -217,6 +244,125 @@ export function generateAccessToken() {
 export function getUserByToken(token) {
   if (!token) return null;
   return db.prepare('SELECT * FROM users WHERE access_token = ? AND is_active = 1').get(token);
+}
+
+// ── CHANNEL HEALTH ──
+
+export function getChannelHealth(channelId) {
+  return db.prepare('SELECT * FROM channel_health WHERE channel_id = ?').get(channelId);
+}
+
+export function setChannelHealth(channelId, { isAlive, responseTimeMs }) {
+  const now = Math.floor(Date.now() / 1000);
+  const existing = db.prepare('SELECT * FROM channel_health WHERE channel_id = ?').get(channelId);
+  if (existing) {
+    if (isAlive) {
+      db.prepare('UPDATE channel_health SET last_check = ?, last_success = ?, is_alive = 1, fail_count = 0, response_time_ms = ? WHERE channel_id = ?')
+        .run(now, now, responseTimeMs || 0, channelId);
+    } else {
+      db.prepare('UPDATE channel_health SET last_check = ?, is_alive = 0, fail_count = fail_count + 1 WHERE channel_id = ?')
+        .run(now, channelId);
+    }
+  } else {
+    db.prepare('INSERT INTO channel_health (channel_id, last_check, last_success, is_alive, fail_count, response_time_ms) VALUES (?, ?, ?, ?, 0, ?)')
+      .run(channelId, now, isAlive ? now : 0, isAlive ? 1 : 0, responseTimeMs || 0);
+  }
+}
+
+export function getAliveChannels(limit = 500) {
+  return db.prepare(`
+    SELECT c.id, c.name, c.logo, c.group_name, c.stream_url
+    FROM channels c
+    LEFT JOIN channel_health h ON h.channel_id = c.id
+    WHERE c.is_active = 1
+    AND (h.is_alive IS NULL OR h.is_alive = 1)
+    ORDER BY c.group_name, c.name
+    LIMIT ?
+  `).all(limit);
+}
+
+// ── BACKUP CHANNELS ──
+
+export function getBackupsForChannel(channelId) {
+  return db.prepare(`
+    SELECT cb.backup_channel_id, cb.priority, c.name, c.logo, c.group_name, c.stream_url,
+           h.is_alive as backup_alive
+    FROM channel_backups cb
+    JOIN channels c ON c.id = cb.backup_channel_id
+    LEFT JOIN channel_health h ON h.channel_id = cb.backup_channel_id
+    WHERE cb.channel_id = ?
+    ORDER BY cb.priority ASC
+  `).all(channelId);
+}
+
+export function addBackupChannel(channelId, backupChannelId, priority = 0) {
+  db.prepare('INSERT OR IGNORE INTO channel_backups (channel_id, backup_channel_id, priority) VALUES (?, ?, ?)')
+    .run(channelId, backupChannelId, priority);
+}
+
+export function removeBackupChannel(channelId, backupChannelId) {
+  db.prepare('DELETE FROM channel_backups WHERE channel_id = ? AND backup_channel_id = ?')
+    .run(channelId, backupChannelId);
+}
+
+export function autoGenerateBackups() {
+  // For every channel in plans, find 2-3 backup candidates from the same group
+  const planChannels = db.prepare(`
+    SELECT DISTINCT pc.channel_id, c.name, c.group_name
+    FROM plan_channels pc
+    JOIN channels c ON c.id = pc.channel_id
+  `).all();
+
+  let created = 0;
+  const insert = db.prepare('INSERT OR IGNORE INTO channel_backups (channel_id, backup_channel_id, priority) VALUES (?, ?, ?)');
+
+  for (const pc of planChannels) {
+    // Check if already has backups
+    const existing = db.prepare('SELECT COUNT(*) as c FROM channel_backups WHERE channel_id = ?').get(pc.channel_id);
+    if (existing.c >= 2) continue; // Already has enough
+
+    // Find candidates: same group, not already a backup, different channel
+    const candidates = db.prepare(`
+      SELECT c.id
+      FROM channels c
+      LEFT JOIN channel_health h ON h.channel_id = c.id
+      WHERE c.group_name = ?
+      AND c.id != ?
+      AND c.is_active = 1
+      AND (h.is_alive IS NULL OR h.is_alive = 1)
+      AND c.id NOT IN (SELECT backup_channel_id FROM channel_backups WHERE channel_id = ?)
+      ORDER BY RANDOM()
+      LIMIT 3
+    `).all(pc.group_name, pc.channel_id, pc.channel_id);
+
+    let priority = (existing.c || 0);
+    for (const cand of candidates) {
+      insert.run(pc.channel_id, cand.id, priority);
+      priority++;
+      created++;
+    }
+  }
+
+  return created;
+}
+
+export function getDeadPlanChannelsWithReplacements() {
+  // Returns channels in plans that are dead, with their best replacement
+  return db.prepare(`
+    SELECT pc.channel_id as dead_channel_id, c.name as dead_name, c.group_name,
+           cb.backup_channel_id, bc.name as backup_name, bc.stream_url as backup_url,
+           bc.logo as backup_logo, bc.group_name as backup_group
+    FROM plan_channels pc
+    JOIN channels c ON c.id = pc.channel_id
+    LEFT JOIN channel_health h ON h.channel_id = c.id
+    JOIN channel_backups cb ON cb.channel_id = c.id
+    JOIN channels bc ON bc.id = cb.backup_channel_id
+    LEFT JOIN channel_health bh ON bh.channel_id = cb.backup_channel_id
+    WHERE (h.is_alive = 0 OR h.is_alive IS NULL)
+    AND (bh.is_alive = 1 OR bh.is_alive IS NULL)
+    AND bc.is_active = 1
+    ORDER BY pc.channel_id, cb.priority
+  `).all();
 }
 
 export default db;
